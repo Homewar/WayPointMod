@@ -31,15 +31,21 @@ import java.util.OptionalInt;
 public final class WaypointRenderPipeline implements AutoCloseable {
     private static final WaypointRenderPipeline INSTANCE = new WaypointRenderPipeline();
     private WaypointRenderPipeline() {}
+    public static WaypointRenderPipeline getInstance() { return INSTANCE; }
 
-    public static WaypointRenderPipeline getInstance() {
-        return INSTANCE;
-    }
-
-    // Filled “through walls” (depth test off)
-    private static final RenderPipeline FILLED_THROUGH_WALLS = RenderPipelines.register(
+    // Луч: обычный depth test (НЕ сквозь блоки)
+    private static final RenderPipeline BEAM_DEPTH = RenderPipelines.register(
             RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
-                    .withLocation(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "pipeline/waypoint_filled_through_walls"))
+                    .withLocation(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "pipeline/waypoint_beam_depth"))
+                    .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+                    .withDepthTestFunction(DepthTestFunction.LEQUAL_DEPTH_TEST)
+                    .build()
+    );
+
+    // Маркер: сквозь блоки (depth test off)
+    private static final RenderPipeline MARKER_THROUGH_WALLS = RenderPipelines.register(
+            RenderPipeline.builder(RenderPipelines.DEBUG_FILLED_SNIPPET)
+                    .withLocation(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "pipeline/waypoint_marker_through_walls"))
                     .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
                     .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
                     .build()
@@ -49,22 +55,40 @@ public final class WaypointRenderPipeline implements AutoCloseable {
     private static final Vector4f COLOR_MODULATOR = new Vector4f(1f, 1f, 1f, 1f);
     private static final Matrix4f IDENTITY_TEX = new Matrix4f(); // identity
 
-    private BufferBuilder buffer;
+    private BufferBuilder beamBuffer;
+    private BufferBuilder markerBuffer;
+
+    private boolean beamHasData = false;
+    private boolean markerHasData = false;
+
     private MappableRingBuffer vertexBuffer;
 
     public static void init() {
-        WorldRenderEvents.BEFORE_TRANSLUCENT.register(INSTANCE::extractAndDraw);
+        WorldRenderEvents.BEFORE_TRANSLUCENT.register(INSTANCE::renderBeamPass);
+        WorldRenderEvents.AFTER_TRANSLUCENT.register(INSTANCE::renderMarkerPass); // если нет — см. ниже
     }
 
     private void extractAndDraw(WorldRenderContext context) {
-        renderWaypoints(context);
+        buildGeometry(context);
 
-        if (buffer != null) {
-            drawFilledThroughWalls(Minecraft.getInstance(), FILLED_THROUGH_WALLS);
+        if (beamBuffer != null) {
+            if (beamHasData) {
+                drawBufferSafe(Minecraft.getInstance(), BEAM_DEPTH, beamBuffer);
+            }
+            beamBuffer = null;
+            beamHasData = false;
+        }
+
+        if (markerBuffer != null) {
+            if (markerHasData) {
+                drawBufferSafe(Minecraft.getInstance(), MARKER_THROUGH_WALLS, markerBuffer);
+            }
+            markerBuffer = null;
+            markerHasData = false;
         }
     }
 
-    private void renderWaypoints(WorldRenderContext context) {
+    private void buildGeometry(WorldRenderContext context) {
         if (!WaypointStorage.isEnabled()) return;
 
         Minecraft mc = Minecraft.getInstance();
@@ -81,12 +105,12 @@ public final class WaypointRenderPipeline implements AutoCloseable {
         poseStack.pushPose();
         poseStack.translate(-cam.x, -cam.y, -cam.z);
 
-        if (buffer == null) {
-            buffer = new BufferBuilder(
-                    ALLOCATOR,
-                    FILLED_THROUGH_WALLS.getVertexFormatMode(),
-                    FILLED_THROUGH_WALLS.getVertexFormat()
-            );
+        // создаём буферы лениво, только если реально будем писать
+        if (beamBuffer == null) {
+            beamBuffer = new BufferBuilder(ALLOCATOR, BEAM_DEPTH.getVertexFormatMode(), BEAM_DEPTH.getVertexFormat());
+        }
+        if (markerBuffer == null) {
+            markerBuffer = new BufferBuilder(ALLOCATOR, MARKER_THROUGH_WALLS.getVertexFormatMode(), MARKER_THROUGH_WALLS.getVertexFormat());
         }
 
         Matrix4f mat = poseStack.last().pose();
@@ -103,28 +127,30 @@ public final class WaypointRenderPipeline implements AutoCloseable {
             int g = (wp.color >> 8) & 255;
             int b = (wp.color) & 255;
 
-            // marker
-            addFilledBoxDoubleSided(
-                    buffer, mat,
-                    wx - 0.30, wy - 0.30, wz - 0.30,
-                    wx + 0.30, wy + 0.30, wz + 0.30,
-                    r, g, b, (int) (0.45f * 255f)
-            );
-
-            // beam
+            // 1) Луч — обычный (скрывается блоками)
             double half = 0.06;
             addFilledBoxDoubleSided(
-                    buffer, mat,
+                    beamBuffer, mat,
                     wx - half, (double) minY, wz - half,
                     wx + half, (double) maxY, wz + half,
                     r, g, b, (int) (0.18f * 255f)
             );
+            beamHasData = true;
+
+            // 2) Маркер — сквозь блоки, чтобы точно видеть место
+            addFilledBoxDoubleSided(
+                    markerBuffer, mat,
+                    wx - 0.30, wy - 0.30, wz - 0.30,
+                    wx + 0.30, wy + 0.30, wz + 0.30,
+                    r, g, b, (int) (0.60f * 255f)
+            );
+            markerHasData = true;
         }
 
         poseStack.popPose();
     }
 
-    // ---------- geometry helpers ----------
+    // ---------- Geometry helpers ----------
 
     private static void addFilledBoxDoubleSided(
             BufferBuilder buf, Matrix4f mat,
@@ -136,55 +162,18 @@ public final class WaypointRenderPipeline implements AutoCloseable {
         double minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
         double minZ = Math.min(z1, z2), maxZ = Math.max(z1, z2);
 
-        // 6 faces, each emitted twice (both windings) so it shows even if cull is enabled somewhere.
-
         // -Z
-        quadBoth(buf, mat,
-                minX, minY, minZ,
-                maxX, minY, minZ,
-                maxX, maxY, minZ,
-                minX, maxY, minZ,
-                r, g, b, a);
-
+        quadBoth(buf, mat, minX, minY, minZ,  maxX, minY, minZ,  maxX, maxY, minZ,  minX, maxY, minZ, r,g,b,a);
         // +Z
-        quadBoth(buf, mat,
-                minX, minY, maxZ,
-                minX, maxY, maxZ,
-                maxX, maxY, maxZ,
-                maxX, minY, maxZ,
-                r, g, b, a);
-
+        quadBoth(buf, mat, minX, minY, maxZ,  minX, maxY, maxZ,  maxX, maxY, maxZ,  maxX, minY, maxZ, r,g,b,a);
         // -X
-        quadBoth(buf, mat,
-                minX, minY, minZ,
-                minX, maxY, minZ,
-                minX, maxY, maxZ,
-                minX, minY, maxZ,
-                r, g, b, a);
-
+        quadBoth(buf, mat, minX, minY, minZ,  minX, maxY, minZ,  minX, maxY, maxZ,  minX, minY, maxZ, r,g,b,a);
         // +X
-        quadBoth(buf, mat,
-                maxX, minY, minZ,
-                maxX, minY, maxZ,
-                maxX, maxY, maxZ,
-                maxX, maxY, minZ,
-                r, g, b, a);
-
+        quadBoth(buf, mat, maxX, minY, minZ,  maxX, minY, maxZ,  maxX, maxY, maxZ,  maxX, maxY, minZ, r,g,b,a);
         // -Y
-        quadBoth(buf, mat,
-                minX, minY, minZ,
-                minX, minY, maxZ,
-                maxX, minY, maxZ,
-                maxX, minY, minZ,
-                r, g, b, a);
-
+        quadBoth(buf, mat, minX, minY, minZ,  minX, minY, maxZ,  maxX, minY, maxZ,  maxX, minY, minZ, r,g,b,a);
         // +Y
-        quadBoth(buf, mat,
-                minX, maxY, minZ,
-                maxX, maxY, minZ,
-                maxX, maxY, maxZ,
-                minX, maxY, maxZ,
-                r, g, b, a);
+        quadBoth(buf, mat, minX, maxY, minZ,  maxX, maxY, minZ,  maxX, maxY, maxZ,  minX, maxY, maxZ, r,g,b,a);
     }
 
     private static void quadBoth(
@@ -201,7 +190,7 @@ public final class WaypointRenderPipeline implements AutoCloseable {
         v(buf, mat, x3, y3, z3, r, g, b, a);
         v(buf, mat, x4, y4, z4, r, g, b, a);
 
-        // reverse
+        // reverse (на случай cull)
         v(buf, mat, x4, y4, z4, r, g, b, a);
         v(buf, mat, x3, y3, z3, r, g, b, a);
         v(buf, mat, x2, y2, z2, r, g, b, a);
@@ -209,37 +198,60 @@ public final class WaypointRenderPipeline implements AutoCloseable {
     }
 
     private static void v(BufferBuilder buf, Matrix4f mat, double x, double y, double z, int r, int g, int b, int a) {
-        buf.addVertex(mat, (float) x, (float) y, (float) z).setColor(r, g, b, a);
+        Object vc = buf.addVertex(mat, (float) x, (float) y, (float) z).setColor(r, g, b, a);
+
+        // В некоторых билдах вершина учитывается только после endVertex()
+        try {
+            var m = vc.getClass().getMethod("endVertex");
+            m.invoke(vc);
+            return;
+        } catch (Throwable ignored) {}
+
+        try {
+            var m = BufferBuilder.class.getMethod("endVertex");
+            m.invoke(buf);
+        } catch (Throwable ignored) {}
     }
 
-    // ---------- upload + draw ----------
+    // ---------- Upload + draw ----------
 
-    private void drawFilledThroughWalls(Minecraft client, RenderPipeline pipeline) {
-        MeshData mesh = buffer.buildOrThrow();
+    private void drawBufferSafe(Minecraft client, RenderPipeline pipeline, BufferBuilder builder) {
+        MeshData mesh;
+        try {
+            mesh = builder.buildOrThrow();
+        } catch (IllegalStateException ignored) {
+            // BufferBuilder пустой — просто не рисуем
+            return;
+        }
+
         MeshData.DrawState drawState = mesh.drawState();
         VertexFormat format = drawState.format();
 
-        GpuBuffer vertices = upload(drawState, format, mesh);
-        draw(client, pipeline, mesh, drawState, vertices, format);
+        GpuBuffer vertices = upload(mesh, drawState, format);
+        drawPass(client, pipeline, mesh, drawState, vertices, format);
 
-        vertexBuffer.rotate();
-        buffer = null;
+        if (vertexBuffer != null) {
+            vertexBuffer.rotate();
+        }
     }
 
-    private GpuBuffer upload(MeshData.DrawState drawState, VertexFormat format, MeshData mesh) {
-        int bytes = drawState.vertexCount() * format.getVertexSize();
+    private GpuBuffer upload(MeshData mesh, MeshData.DrawState drawState, VertexFormat format) {
+        int bytesNeeded = mesh.vertexBuffer().remaining();
 
-        if (vertexBuffer == null || vertexBuffer.size() < bytes) {
+        // запас, чтобы slice(0, bytesNeeded) точно был внутри диапазона
+        int allocBytes = bytesNeeded + 64;
+
+        if (vertexBuffer == null || vertexBuffer.size() < allocBytes) {
             vertexBuffer = new MappableRingBuffer(
                     () -> WaypointMod.MOD_ID + " waypoint pipeline",
                     GpuBuffer.USAGE_VERTEX | GpuBuffer.USAGE_MAP_WRITE,
-                    bytes
+                    allocBytes
             );
         }
 
         var encoder = RenderSystem.getDevice().createCommandEncoder();
         try (GpuBuffer.MappedView mapped = encoder.mapBuffer(
-                vertexBuffer.currentBuffer().slice(0, mesh.vertexBuffer().remaining()),
+                vertexBuffer.currentBuffer().slice(0, bytesNeeded),
                 false,
                 true
         )) {
@@ -249,7 +261,7 @@ public final class WaypointRenderPipeline implements AutoCloseable {
         return vertexBuffer.currentBuffer();
     }
 
-    private static void draw(
+    private static void drawPass(
             Minecraft client,
             RenderPipeline pipeline,
             MeshData mesh,
