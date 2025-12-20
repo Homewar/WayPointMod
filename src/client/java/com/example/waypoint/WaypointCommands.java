@@ -19,6 +19,8 @@ public final class WaypointCommands {
         return Integer.parseInt(t, 16) & 0xFFFFFF;
     }
 
+
+
     public static void register(CommandDispatcher<FabricClientCommandSource> dispatcher) {
         LiteralCommandNode<FabricClientCommandSource> root = dispatcher.register(literal("wp"));
 
