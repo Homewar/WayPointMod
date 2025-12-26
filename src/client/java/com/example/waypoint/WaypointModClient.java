@@ -16,5 +16,7 @@ public class WaypointModClient implements ClientModInitializer {
         WaypointRenderPipeline.init();
         WaypointDeathTracker.register();
         WaypointHud.register();
+
+        WaypointGui.register();
     }
 }

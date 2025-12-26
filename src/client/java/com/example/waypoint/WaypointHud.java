@@ -26,7 +26,7 @@ public final class WaypointHud {
     private static KeyMapping prevPage;
 
     // ВАЖНО: поле должно быть на уровне класса, не внутри register()
-    private static final KeyMapping.Category CATEGORY =
+    public static final KeyMapping.Category CATEGORY =
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypointmod"));
 
     public static void register() {

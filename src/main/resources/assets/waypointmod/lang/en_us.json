@@ -1,5 +1,31 @@
 {
   "key.waypointmod.hud_next": "HUD next page",
   "key.waypointmod.hud_prev": "HUD previous page",
-  "key.category.waypointmod.waypoint": "Waypoint Mod"
+  "key.category.waypointmod.waypoint": "Waypoint Mod",
+  "key.waypointmod.open_gui": "Open Waypoints",
+
+
+  "screen.waypointmod.prev": "Previous",
+  "screen.waypointmod.next": "Next",
+  "screen.waypointmod.title": "Waypoints",
+  "screen.waypointmod.search": "Search",
+  "screen.waypointmod.add": "Add",
+  "screen.waypointmod.edit": "Edit",
+  "screen.waypointmod.delete": "Delete",
+  "screen.waypointmod.hide": "Hide",
+  "screen.waypointmod.show": "Show",
+  "screen.waypointmod.send": "Send",
+  "screen.waypointmod.toggle": "Toggle",
+
+  "screen.waypointmod.on": "Enabled",
+  "screen.waypointmod.off": "Disabled",
+
+  "screen.waypointmod.edit_title": "Edit waypoint",
+  "screen.waypointmod.save": "Save",
+  "screen.waypointmod.cancel": "Cancel",
+  "screen.waypointmod.name": "Name",
+  "screen.waypointmod.xyz": "X / Y / Z",
+  "screen.waypointmod.color": "Color (#RRGGBB)"
 }
+
+

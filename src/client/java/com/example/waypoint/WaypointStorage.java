@@ -33,6 +33,8 @@ public final class WaypointStorage {
         public String kind;      // "normal" | "death"
         public long createdAt;   // millis
 
+        public boolean hidden;
+
         public Waypoint(String name, String world, String dimension, int x, int y, int z, int color) {
             this.name = name;
             this.world = world;
@@ -117,20 +119,6 @@ public final class WaypointStorage {
 
         all.removeIf(w -> world.equals(w.world) && dim.equals(w.dimension));
         save();
-    }
-
-    public static List<Waypoint> listForCurrent(Minecraft mc) {
-        ensureAssigned(mc);
-        if (mc.level == null) return List.of();
-
-        String world = currentWorldId(mc);
-        String dim = currentDimId(mc);
-
-        ArrayList<Waypoint> out = new ArrayList<>();
-        for (var w : all) {
-            if (world.equals(w.world) && dim.equals(w.dimension)) out.add(w);
-        }
-        return out;
     }
 
     public static void addDeath(Minecraft mc) {
@@ -227,10 +215,12 @@ public final class WaypointStorage {
 
                     String kind = optString(o, "kind", "normal");
                     long createdAt = o.has("createdAt") ? o.get("createdAt").getAsLong() : System.currentTimeMillis();
+                    boolean hidden = o.has("hidden") && o.get("hidden").getAsBoolean();
 
                     Waypoint w = new Waypoint(name, world, dim, x, y, z, color);
                     w.kind = kind;
                     w.createdAt = createdAt;
+                    w.hidden = hidden;
                     all.add(w);
                 }
             }
@@ -261,6 +251,7 @@ public final class WaypointStorage {
                 o.addProperty("color", w.color);
                 o.addProperty("kind", w.kind == null ? "normal" : w.kind);
                 o.addProperty("createdAt", w.createdAt == 0 ? System.currentTimeMillis() : w.createdAt);
+                o.addProperty("hidden", w.hidden);
                 arr.add(o);
             }
             root.add("waypoints", arr);
@@ -322,4 +313,64 @@ public final class WaypointStorage {
             return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir();
         }
     }
+
+    public static List<Waypoint> listForCurrentAll(Minecraft mc) {
+        ensureAssigned(mc);
+        if (mc.level == null) return List.of();
+
+        String world = currentWorldId(mc);
+        String dim = currentDimId(mc);
+
+        ArrayList<Waypoint> out = new ArrayList<>();
+        for (var w : all) {
+            if (world.equals(w.world) && dim.equals(w.dimension)) out.add(w);
+        }
+        return out;
+    }
+
+    public static List<Waypoint> listForCurrent(Minecraft mc) {
+        List<Waypoint> cur = listForCurrentAll(mc);
+        if (cur.isEmpty()) return cur;
+
+        ArrayList<Waypoint> out = new ArrayList<>(cur.size());
+        for (var w : cur) if (!w.hidden) out.add(w);
+        return out;
+    }
+
+    public static void setHidden(Minecraft mc, String name, boolean hidden) {
+        ensureAssigned(mc);
+        if (mc.level == null) return;
+
+        String world = currentWorldId(mc);
+        String dim = currentDimId(mc);
+
+        boolean changed = false;
+        for (var w : all) {
+            if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
+                if (w.hidden != hidden) {
+                    w.hidden = hidden;
+                    changed = true;
+                }
+            }
+        }
+        if (changed) save();
+    }
+
+    public static void toggleHidden(Minecraft mc, String name) {
+        ensureAssigned(mc);
+        if (mc.level == null) return;
+
+        String world = currentWorldId(mc);
+        String dim = currentDimId(mc);
+
+        for (var w : all) {
+            if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
+                w.hidden = !w.hidden;
+                save();
+                return;
+            }
+        }
+    }
+
+
 }
