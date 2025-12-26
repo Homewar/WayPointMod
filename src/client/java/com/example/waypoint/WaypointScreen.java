@@ -272,9 +272,11 @@ public class WaypointScreen extends Screen {
         Minecraft mc = Minecraft.getInstance();
         WaypointStorage.Waypoint sel = selected();
         if (sel == null || mc.player == null) return;
-        String name = (sel.name == null ? "wp" : sel.name);
 
-        String msg = name + ":" + sel.x + " " + sel.y + " " + sel.z;
+        String name = (sel.name == null || sel.name.isBlank()) ? "wp" : sel.name;
+        name = name.replaceAll("\\s+", "_"); // команда /wp set принимает word
+
+        String msg = "WP|" + name + "|" + sel.x + "|" + sel.y + "|" + sel.z;
 
         mc.setScreen(new net.minecraft.client.gui.screens.ChatScreen(msg, false));
     }
