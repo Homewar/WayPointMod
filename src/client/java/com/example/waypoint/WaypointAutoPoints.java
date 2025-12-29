@@ -1,0 +1,225 @@
+package com.example.waypoint;
+
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
+import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.minecraft.advancements.AdvancementProgress;
+import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
+import net.minecraft.resources.Identifier;
+import net.minecraft.util.Mth;
+import java.lang.reflect.Method;
+import com.mojang.logging.LogUtils;
+import org.slf4j.Logger;
+
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+public final class WaypointAutoPoints {
+    private WaypointAutoPoints() {}
+
+    // ==== Settings / names ====
+    private static final int COLOR_FIRST_JOIN = 0x55FF55;
+    private static final int COLOR_SPAWN      = 0x55FFFF;
+    private static final int COLOR_NETHER     = 0xFF5555;
+    private static final int COLOR_END        = 0xAA55FF;
+
+    // ==== Session tracking for transitions ====
+    private static String lastWorldId = null;
+    private static String lastDimId = null;
+    private static boolean didFirstJoinHere = false;
+    private static boolean didSpawnPoint = false;
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    // ==== Advancement auto-waypoints ====
+    private static final Map<Identifier, Spec> SPECS = new HashMap<>();
+    private static final Map<String, Set<Identifier>> TRIGGERED = new HashMap<>();
+
+    static {
+        // Nether fortress
+        SPECS.put(Identifier.parse("nether/find_fortress"),
+                new Spec("NetherFortress", 0xFF5555));
+        
+        // Stronghold (Eye Spy)
+        SPECS.put(Identifier.parse("story/follow_ender_eye"),
+                new Spec("Stronghold", 0xAA66FF));
+
+        // End city
+        SPECS.put(Identifier.parse("end/find_end_city"),
+                new Spec("EndCity", 0xFF55FF));
+    }
+
+    private record Spec(String name, int color) {}
+
+    public static void init() {
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> resetSession());
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            resetSession();
+            TRIGGERED.clear();
+        });
+
+        ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null || mc.level == null) return;
+
+            String world = WaypointStorage.currentWorldId(mc);
+            String dim = WaypointStorage.currentDimId(mc);
+
+            if (lastWorldId == null) {
+                lastWorldId = world;
+                lastDimId = dim;
+                didFirstJoinHere = false;
+                didSpawnPoint = false;
+            }
+
+            // 1) First join marker (current position)
+            if (!didFirstJoinHere) {
+                didFirstJoinHere = true;
+                createOnce(mc, "FirstJoin", COLOR_FIRST_JOIN,
+                        Mth.floor(mc.player.getX()),
+                        Mth.floor(mc.player.getY()),
+                        Mth.floor(mc.player.getZ()));
+            }
+
+            // 2) World spawn marker (shared spawn) — once per session
+            if (!didSpawnPoint) {
+                didSpawnPoint = true;
+                BlockPos sp = tryGetSpawnPos(mc);
+                if (sp != null) {
+                    createOnce(mc, "WorldSpawn", COLOR_SPAWN, sp.getX(), sp.getY(), sp.getZ());
+                }
+            }
+
+            // 3) Dimension change marker
+            if (lastDimId != null && !dim.equals(lastDimId)) {
+                lastDimId = dim;
+
+                String shortDim = shortDim(dim);
+                int c = switch (shortDim) {
+                    case "the_nether" -> COLOR_NETHER;
+                    case "the_end" -> COLOR_END;
+                    default -> COLOR_SPAWN;
+                };
+
+                createOnce(mc, "Entered_" + shortDim, c,
+                        Mth.floor(mc.player.getX()),
+                        Mth.floor(mc.player.getY()),
+                        Mth.floor(mc.player.getZ()));
+            }
+        });
+    }
+
+    private static void resetSession() {
+        lastWorldId = null;
+        lastDimId = null;
+        didFirstJoinHere = false;
+        didSpawnPoint = false;
+    }
+
+    /**
+     * Вызывается миксином ClientAdvancementsMixin после packet update.
+     * progressUpdates: только обновлённые ачивки.
+     */
+    public static void onAdvancementProgressUpdate(Map<Identifier, AdvancementProgress> progressUpdates) {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.player == null || mc.level == null) return;
+        if (progressUpdates == null || progressUpdates.isEmpty()) return;
+
+        String worldKey = WaypointStorage.currentWorldId(mc);
+        Set<Identifier> seen = TRIGGERED.computeIfAbsent(worldKey, k -> new HashSet<>());
+        
+        for (var e : progressUpdates.entrySet()) {
+            var id = e.getKey();
+            var prog = e.getValue();
+            LOGGER.info("[WP] adv update: {} done={}", id, (prog != null && prog.isDone()));
+        }
+
+        for (var e : progressUpdates.entrySet()) {
+            Identifier id = e.getKey();
+            AdvancementProgress prog = e.getValue();
+            if (id == null || prog == null) continue;
+
+            Spec spec = SPECS.get(id);
+            if (spec == null) continue;
+            if (seen.contains(id)) continue;
+            if (!prog.isDone()) continue;
+
+            int x = Mth.floor(mc.player.getX());
+            int y = Mth.floor(mc.player.getY());
+            int z = Mth.floor(mc.player.getZ());
+
+            WaypointStorage.set(mc, spec.name, x, y, z, spec.color);
+            seen.add(id);
+        }
+    }
+
+    private static void createOnce(Minecraft mc, String name, int color, int x, int y, int z) {
+        for (var w : WaypointStorage.listForCurrentAll(mc)) {
+            if (w.name != null && w.name.equalsIgnoreCase(name)) return;
+        }
+        WaypointStorage.set(mc, name, x, y, z, color);
+    }
+
+    private static String shortDim(String dimId) {
+        String s = dimId.toLowerCase(Locale.ROOT);
+        int idx = s.lastIndexOf("minecraft:");
+        if (idx >= 0) s = s.substring(idx + "minecraft:".length());
+        s = s.replace("]", "")
+             .replace("resourcekey[minecraft:dimension / ", "")
+             .trim();
+        if (s.isEmpty()) s = "unknown";
+        return s;
+    }
+
+    private static BlockPos tryGetSpawnPos(Minecraft mc) {
+        if (mc == null || mc.level == null) return null;
+
+        Object level = mc.level;
+
+        // 1) Пробуем методы уровня (ClientLevel/Level)
+        BlockPos p = (BlockPos) invokeNoArgs(level, BlockPos.class,
+                "getSharedSpawnPos",
+                "getSharedSpawnPosition",
+                "getSpawnPos",
+                "getSpawnPosition"
+        );
+        if (p != null) return p;
+
+        // 2) Пробуем LevelData / world data
+        Object levelData = invokeNoArgs(level, Object.class,
+                "getLevelData",
+                "getLevelDataUnsafe",
+                "getWorldData"
+        );
+
+        if (levelData != null) {
+            p = (BlockPos) invokeNoArgs(levelData, BlockPos.class,
+                    "getSpawnPos",
+                    "getSpawnPosition"
+            );
+            if (p != null) return p;
+
+            // 3) Пробуем координаты спавна по отдельности
+            Integer x = (Integer) invokeNoArgs(levelData, Integer.class, "getXSpawn", "getSpawnX");
+            Integer y = (Integer) invokeNoArgs(levelData, Integer.class, "getYSpawn", "getSpawnY");
+            Integer z = (Integer) invokeNoArgs(levelData, Integer.class, "getZSpawn", "getSpawnZ");
+
+            if (x != null && y != null && z != null) return new BlockPos(x, y, z);
+        }
+
+        return null;
+    }
+
+    private static Object invokeNoArgs(Object target, Class<?> expected, String... names) {
+        for (String n : names) {
+            try {
+                Method m = target.getClass().getMethod(n);
+                Object r = m.invoke(target);
+                if (r != null && expected.isInstance(r)) return r;
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+}

@@ -30,5 +30,8 @@
 	},
 	"suggests": {
 		"another-mod": "*"
-	}
+	},
+	"mixins": [
+		"waypoint.mixins.json"
+	]
 }

@@ -3,10 +3,14 @@ package com.example.waypoint;
 import com.google.gson.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.storage.LevelResource;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
@@ -166,15 +170,20 @@ public final class WaypointStorage {
     }
 
     public static String currentDimId(Minecraft mc) {
-    if (mc.level == null) return "unknown";
-    return mc.level.dimension().toString();
-    }
+        if (mc.level == null) return "unknown";
+        return mc.level.dimension().toString();
+        }
 
-    public static String currentWorldId(Minecraft mc) {
+        public static String currentWorldId(Minecraft mc) {
         MinecraftServer server = mc.getSingleplayerServer();
         if (server != null) {
-            Path root = server.getWorldPath(LevelResource.ROOT);
-            return "sp:" + root.toAbsolutePath().normalize();
+            Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+
+            long seed = readWorldSeed(root);
+            if (seed != -1L) {
+                return "sp:" + root + "#seed=" + seed;
+            }
+            return "sp:" + root;
         }
 
         ServerData data = mc.getCurrentServer();
@@ -183,6 +192,29 @@ public final class WaypointStorage {
         }
 
         return "unknown";
+    }
+
+    private static long readWorldSeed(Path worldRoot) {
+        Path levelDat = worldRoot.resolve("level.dat");
+        if (!Files.exists(levelDat)) return -1L;
+
+        try (InputStream in = Files.newInputStream(levelDat)) {
+            // Очень большой лимит, чтобы точно не упереться в ограничения
+            CompoundTag root = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
+            if (root == null) return -1L;
+
+            // root.getCompound(...) -> Optional<CompoundTag>
+            CompoundTag data = root.getCompound("Data").orElse(null);
+            if (data == null) return -1L;
+
+            CompoundTag wgs = data.getCompound("WorldGenSettings").orElse(null);
+            if (wgs == null) return -1L;
+
+            // wgs.getLong("seed") -> Optional<Long>
+            return wgs.getLong("seed").orElse(-1L);
+        } catch (Exception e) {
+            return -1L;
+        }
     }
 
     public static void load() {
