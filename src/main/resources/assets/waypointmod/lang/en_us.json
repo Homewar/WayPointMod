@@ -1,11 +1,11 @@
 {
   "key.waypointmod.hud_next": "HUD next page",
-  "key.waypointmod.hud_prev": "HUD previous page",
-  "key.category.waypointmod.waypoint": "Waypoint Mod",
+  "key.waypointmod.hud_prev": "HUD prev page",
+  "key.category.waypointmod.waypointmod": "Waypoints",
   "key.waypointmod.open_gui": "Open Waypoints",
 
 
-  "screen.waypointmod.prev": "Previous",
+  "screen.waypointmod.prev": "Prev",
   "screen.waypointmod.next": "Next",
   "screen.waypointmod.title": "Waypoints",
   "screen.waypointmod.search": "Search",
@@ -17,15 +17,18 @@
   "screen.waypointmod.send": "Send",
   "screen.waypointmod.toggle": "Toggle",
 
-  "screen.waypointmod.on": "Enabled",
-  "screen.waypointmod.off": "Disabled",
+  "screen.waypointmod.on": "Markers Enabled",
+  "screen.waypointmod.off": "Markers Disabled",
 
   "screen.waypointmod.edit_title": "Edit waypoint",
   "screen.waypointmod.save": "Save",
   "screen.waypointmod.cancel": "Cancel",
   "screen.waypointmod.name": "Name",
   "screen.waypointmod.xyz": "X / Y / Z",
-  "screen.waypointmod.color": "Color (#RRGGBB)"
+  "screen.waypointmod.color": "Color (#RRGGBB)",
+  "screen.waypointmod.auto_points": "Auto Points",
+  "screen.waypointmod.auto_points.on": "Auto Points: Enabled",
+  "screen.waypointmod.auto_points.off": "Auto Points: Disabled"
 }
 
 

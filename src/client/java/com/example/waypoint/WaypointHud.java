@@ -13,7 +13,7 @@ import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.Comparator;
+import java.util.ArrayList;
 import java.util.List;
 
 public final class WaypointHud {
@@ -25,7 +25,6 @@ public final class WaypointHud {
     private static KeyMapping nextPage;
     private static KeyMapping prevPage;
 
-    // ВАЖНО: поле должно быть на уровне класса, не внутри register()
     public static final KeyMapping.Category CATEGORY =
             KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypointmod"));
 
@@ -62,18 +61,29 @@ public final class WaypointHud {
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
 
-        List<WaypointStorage.Waypoint> list = WaypointStorage.listForCurrent(mc);
+        // ВАЖНО: берём all, чтобы favorites учитывались всегда одинаково.
+        // Hidden отфильтруем тут.
+        List<WaypointStorage.Waypoint> src = WaypointStorage.listForCurrentAll(mc);
+        if (src.isEmpty()) return;
+
+        ArrayList<WaypointStorage.Waypoint> list = new ArrayList<>(src.size());
+        for (var w : src) {
+            if (w == null) continue;
+            if (w.hidden) continue; // hidden скрывает в HUD
+            list.add(w);
+        }
         if (list.isEmpty()) return;
 
-        list = list.stream()
-                .sorted(Comparator.comparingDouble(wp -> distSq(mc, wp)))
-                .toList();
+        // Сортировка: избранные первыми, внутри групп — по дистанции
+        list.sort((a, b) -> {
+            if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
+            return Double.compare(distSq(mc, a), distSq(mc, b));
+        });
 
         int total = list.size();
         int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
 
-        if (page < 0) page = 0;
-        if (page > pages - 1) page = pages - 1;
+        page = Mth.clamp(page, 0, pages - 1);
 
         int from = page * PAGE_SIZE;
         int to = Math.min(from + PAGE_SIZE, total);
@@ -81,7 +91,7 @@ public final class WaypointHud {
         int x = 8;
         int y = 8;
 
-        String header = "Waypoints " + (page + 1) + "/" + pages + "  (PgUp/PgDn)";
+        String header = "Waypoints " + (page + 1) + "/" + pages;
         g.drawString(mc.font, header, x, y, 0xFFFFFFFF, true);
         y += 12;
 
@@ -89,7 +99,10 @@ public final class WaypointHud {
             var wp = list.get(i);
             int dist = (int) Math.round(Math.sqrt(distSq(mc, wp)));
             String arrow = arrowTo(mc, wp);
-            String line = arrow + " " + wp.name + " [" + dist + "m]";
+
+            String name = (wp.name == null) ? "(unnamed)" : wp.name;
+            String star = wp.favorite ? "★ " : "";
+            String line = arrow + " " + star + name + " [" + dist + "m]";
 
             int argb = 0xFF000000 | (wp.color & 0xFFFFFF);
             g.drawString(mc.font, line, x, y, argb, true);

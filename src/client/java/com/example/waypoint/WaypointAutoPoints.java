@@ -8,8 +8,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 import java.lang.reflect.Method;
-import com.mojang.logging.LogUtils;
-import org.slf4j.Logger;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -31,28 +29,56 @@ public final class WaypointAutoPoints {
     private static String lastDimId = null;
     private static boolean didFirstJoinHere = false;
     private static boolean didSpawnPoint = false;
-    private static final Logger LOGGER = LogUtils.getLogger();
 
     // ==== Advancement auto-waypoints ====
     private static final Map<Identifier, Spec> SPECS = new HashMap<>();
     private static final Map<String, Set<Identifier>> TRIGGERED = new HashMap<>();
 
-    static {
-        // Nether fortress
-        SPECS.put(Identifier.parse("nether/find_fortress"),
-                new Spec("NetherFortress", 0xFF5555));
-        
-        // Stronghold (Eye Spy)
-        SPECS.put(Identifier.parse("story/follow_ender_eye"),
-                new Spec("Stronghold", 0xAA66FF));
+        static {
+        // ====== измерения / ключевые прогресс-события ======
+        put("story/enter_the_nether", "EnterNether", 0xFFAA00);
+        put("story/enter_the_end", "EnterEnd", 0xAA55FF);
+        put("end/kill_dragon", "DragonKilled", 0xFF55FF);
+        put("end/enter_end_gateway", "EndGateway", 0x55FFFF);
 
-        // End city
-        SPECS.put(Identifier.parse("end/find_end_city"),
-                new Spec("EndCity", 0xFF55FF));
+        // ====== Stronghold / путь к Энду ======
+        put("story/follow_ender_eye", "Stronghold", 0xAA66FF);
+
+        // ====== Nether structures ======
+        put("nether/find_fortress", "NetherFortress", 0xFF5555);
+
+        // Bastion (есть два варианта — “нашёл” и “залутал”)
+        put("nether/find_bastion", "Bastion", 0xFFAA00);
+        put("nether/loot_bastion", "BastionLoot", 0xFFCC55);
+
+        // ====== End structures ======
+        put("end/find_end_city", "EndCity", 0xFF55FF);
+        put("end/elytra", "Elytra", 0x55FFDD);
+
+        // ====== Trial Chambers (1.21+) ======
+        // Если в твоей версии какой-то id отличается — включи лог и подставь фактический id.
+        put("adventure/minecraft_trials_edition", "TrialChambers", 0x55FFFF);
+        put("adventure/under_lock_and_key", "TrialVault", 0x66FFCC);
+        put("adventure/revaulting", "OminousVault", 0x66CCFF);
+
+        // ====== Полезные “прокси” (не строго структура, но часто привязано к месту) ======
+        put("adventure/voluntary_exile", "PillagerCaptain", 0xBBBBBB); // часто возле аванпоста/патруля
+        put("adventure/hero_of_the_village", "RaidWin", 0x55FF55);     // деревня
+        put("adventure/totem_of_undying", "Evoker", 0xFFFF55);         // рейд/особняк
+
+        // Deep Dark “прокси”
+        put("adventure/avoid_vibration", "DeepDark", 0x5577FF);
+        put("adventure/kill_mob_near_sculk_catalyst", "SculkCatalyst", 0x3355FF);
+
+        // Навигация / база
+        put("adventure/use_lodestone", "Lodestone", 0x55FFFF);
     }
 
     private record Spec(String name, int color) {}
 
+    private static void put(String advId, String wpName, int color) {
+        SPECS.put(Identifier.parse(advId), new Spec(wpName, color));
+    }
     public static void init() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> resetSession());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -123,18 +149,13 @@ public final class WaypointAutoPoints {
      * progressUpdates: только обновлённые ачивки.
      */
     public static void onAdvancementProgressUpdate(Map<Identifier, AdvancementProgress> progressUpdates) {
+        if (!WaypointStorage.isAutoPointsEnabled()) return;
         Minecraft mc = Minecraft.getInstance();
         if (mc.player == null || mc.level == null) return;
         if (progressUpdates == null || progressUpdates.isEmpty()) return;
 
         String worldKey = WaypointStorage.currentWorldId(mc);
         Set<Identifier> seen = TRIGGERED.computeIfAbsent(worldKey, k -> new HashSet<>());
-        
-        for (var e : progressUpdates.entrySet()) {
-            var id = e.getKey();
-            var prog = e.getValue();
-            LOGGER.info("[WP] adv update: {} done={}", id, (prog != null && prog.isDone()));
-        }
 
         for (var e : progressUpdates.entrySet()) {
             Identifier id = e.getKey();
@@ -153,6 +174,11 @@ public final class WaypointAutoPoints {
             WaypointStorage.set(mc, spec.name, x, y, z, spec.color);
             seen.add(id);
         }
+    }
+
+    /** Если хочешь очищать кэш на дисконнекте — вызови это из твоего client init */
+    public static void clearTriggered() {
+        TRIGGERED.clear();
     }
 
     private static void createOnce(Minecraft mc, String name, int color, int x, int y, int z) {

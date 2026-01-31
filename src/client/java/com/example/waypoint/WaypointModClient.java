@@ -19,5 +19,6 @@ public class WaypointModClient implements ClientModInitializer {
         WaypointGui.register();
         WaypointChatLinks.register();
         WaypointAutoPoints.init();
+        WaypointLocatorHud.init();
     }
 }

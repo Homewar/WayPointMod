@@ -23,6 +23,11 @@ public final class WaypointStorage {
 
     private static boolean enabled = true;
     private static int deathLimit = 3;
+    private static boolean autoPointsEnabled = true;
+    public static boolean isAutoPointsEnabled() { return autoPointsEnabled; }
+    public static void toggleAutoPoints() { autoPointsEnabled = !autoPointsEnabled; save(); }
+    public static void setAutoPointsEnabled(boolean v) { autoPointsEnabled = v; save(); }
+
 
     private static final List<Waypoint> all = new ArrayList<>();
 
@@ -32,12 +37,15 @@ public final class WaypointStorage {
         public String name;
         public String world;
         public String dimension;
+        public String kind;      // "normal" | "death"
+
         public int x, y, z;
         public int color;        // 0xRRGGBB
-        public String kind;      // "normal" | "death"
+        
         public long createdAt;   // millis
-
+        
         public boolean hidden;
+        public boolean favorite;
 
         public Waypoint(String name, String world, String dimension, int x, int y, int z, int color) {
             this.name = name;
@@ -221,7 +229,7 @@ public final class WaypointStorage {
         all.clear();
         enabled = true;
         deathLimit = 3;
-
+        
         if (!Files.exists(FILE)) return;
 
         try {
@@ -230,6 +238,8 @@ public final class WaypointStorage {
 
             enabled = root.has("enabled") && root.get("enabled").getAsBoolean();
             deathLimit = root.has("deathLimit") ? root.get("deathLimit").getAsInt() : 3;
+            autoPointsEnabled = !root.has("autoPointsEnabled") || root.get("autoPointsEnabled").getAsBoolean();
+
 
             if (root.has("waypoints") && root.get("waypoints").isJsonArray()) {
                 for (JsonElement e : root.getAsJsonArray("waypoints")) {
@@ -248,11 +258,13 @@ public final class WaypointStorage {
                     String kind = optString(o, "kind", "normal");
                     long createdAt = o.has("createdAt") ? o.get("createdAt").getAsLong() : System.currentTimeMillis();
                     boolean hidden = o.has("hidden") && o.get("hidden").getAsBoolean();
+                    boolean favorite = o.has("favorite") && o.get("favorite").getAsBoolean();
 
                     Waypoint w = new Waypoint(name, world, dim, x, y, z, color);
                     w.kind = kind;
                     w.createdAt = createdAt;
                     w.hidden = hidden;
+                    w.favorite = favorite;
                     all.add(w);
                 }
             }
@@ -270,6 +282,7 @@ public final class WaypointStorage {
             JsonObject root = new JsonObject();
             root.addProperty("enabled", enabled);
             root.addProperty("deathLimit", deathLimit);
+            root.addProperty("autoPointsEnabled", autoPointsEnabled);
 
             JsonArray arr = new JsonArray();
             for (var w : all) {
@@ -284,6 +297,7 @@ public final class WaypointStorage {
                 o.addProperty("kind", w.kind == null ? "normal" : w.kind);
                 o.addProperty("createdAt", w.createdAt == 0 ? System.currentTimeMillis() : w.createdAt);
                 o.addProperty("hidden", w.hidden);
+                o.addProperty("favorite", w.favorite);
                 arr.add(o);
             }
             root.add("waypoints", arr);
@@ -404,5 +418,39 @@ public final class WaypointStorage {
         }
     }
 
+    public static void setFavorite(Minecraft mc, String name, boolean favorite) {
+    ensureAssigned(mc);
+    if (mc.level == null) return;
+
+    String world = currentWorldId(mc);
+    String dim = currentDimId(mc);
+
+    boolean changed = false;
+    for (var w : all) {
+        if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
+            if (w.favorite != favorite) {
+                w.favorite = favorite;
+                changed = true;
+            }
+        }
+    }
+    if (changed) save();
+    }
+
+    public static void toggleFavorite(Minecraft mc, String name) {
+        ensureAssigned(mc);
+        if (mc.level == null) return;
+
+        String world = currentWorldId(mc);
+        String dim = currentDimId(mc);
+
+        for (var w : all) {
+            if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
+                w.favorite = !w.favorite;
+                save();
+                return;
+            }
+        }
+    }
 
 }
