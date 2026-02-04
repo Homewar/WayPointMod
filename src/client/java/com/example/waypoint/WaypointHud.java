@@ -17,7 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public final class WaypointHud {
-    private WaypointHud() {}
+    private WaypointHud() {
+    }
 
     private static final int PAGE_SIZE = 5;
     private static int page = 0;
@@ -25,58 +26,68 @@ public final class WaypointHud {
     private static KeyMapping nextPage;
     private static KeyMapping prevPage;
 
-    public static final KeyMapping.Category CATEGORY =
-            KeyMapping.Category.register(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypointmod"));
+    public static final KeyMapping.Category CATEGORY = KeyMapping.Category
+            .register(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypointmod"));
 
     public static void register() {
         nextPage = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.waypointmod.hud_next",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PAGE_DOWN,
-                CATEGORY
-        ));
+                CATEGORY));
 
         prevPage = KeyBindingHelper.registerKeyBinding(new KeyMapping(
                 "key.waypointmod.hud_prev",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PAGE_UP,
-                CATEGORY
-        ));
+                CATEGORY));
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (nextPage.consumeClick()) page++;
-            while (prevPage.consumeClick()) page--;
+            while (nextPage.consumeClick())
+                page++;
+            while (prevPage.consumeClick())
+                page--;
         });
 
         HudElementRegistry.attachElementBefore(
                 VanillaHudElements.CHAT,
                 Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypoint_hud"),
-                WaypointHud::render
-        );
+                WaypointHud::render);
     }
 
     private static void render(GuiGraphics g, DeltaTracker tickCounter) {
-        if (!WaypointStorage.isEnabled()) return;
+        if (!WaypointStorage.isEnabled())
+            return;
+        if (!WaypointStorage.isHudEnabled())
+            return;
+        if (!WaypointStorage.isWaypointHudEnabled())
+            return;
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null)
+            return;
 
         // ВАЖНО: берём all, чтобы favorites учитывались всегда одинаково.
         // Hidden отфильтруем тут.
         List<WaypointStorage.Waypoint> src = WaypointStorage.listForCurrentAll(mc);
-        if (src.isEmpty()) return;
+        if (src.isEmpty())
+            return;
 
         ArrayList<WaypointStorage.Waypoint> list = new ArrayList<>(src.size());
         for (var w : src) {
-            if (w == null) continue;
-            if (w.hidden) continue; // hidden скрывает в HUD
+            if (w == null)
+                continue;
+            if (w.hidden)
+                continue; // hidden скрывает в HUD
             list.add(w);
         }
-        if (list.isEmpty()) return;
+        if (list.isEmpty())
+            return;
 
         // Сортировка: избранные первыми, внутри групп — по дистанции
         list.sort((a, b) -> {
-            if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
+            if (a.favorite != b.favorite)
+                return a.favorite ? -1 : 1;
             return Double.compare(distSq(mc, a), distSq(mc, b));
         });
 
@@ -125,13 +136,20 @@ public final class WaypointHud {
         float playerYaw = mc.player.getYRot();
         float delta = Mth.wrapDegrees(targetYaw - playerYaw);
 
-        if (delta >= -22.5f && delta < 22.5f) return "↑";
-        if (delta >= 22.5f && delta < 67.5f) return "↗";
-        if (delta >= 67.5f && delta < 112.5f) return "→";
-        if (delta >= 112.5f && delta < 157.5f) return "↘";
-        if (delta >= 157.5f || delta < -157.5f) return "↓";
-        if (delta >= -157.5f && delta < -112.5f) return "↙";
-        if (delta >= -112.5f && delta < -67.5f) return "←";
+        if (delta >= -22.5f && delta < 22.5f)
+            return "↑";
+        if (delta >= 22.5f && delta < 67.5f)
+            return "↗";
+        if (delta >= 67.5f && delta < 112.5f)
+            return "→";
+        if (delta >= 112.5f && delta < 157.5f)
+            return "↘";
+        if (delta >= 157.5f || delta < -157.5f)
+            return "↓";
+        if (delta >= -157.5f && delta < -112.5f)
+            return "↙";
+        if (delta >= -112.5f && delta < -67.5f)
+            return "←";
         return "↖";
     }
 }

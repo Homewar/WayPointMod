@@ -16,13 +16,14 @@ import java.util.Map;
 import java.util.Set;
 
 public final class WaypointAutoPoints {
-    private WaypointAutoPoints() {}
+    private WaypointAutoPoints() {
+    }
 
     // ==== Settings / names ====
     private static final int COLOR_FIRST_JOIN = 0x55FF55;
-    private static final int COLOR_SPAWN      = 0x55FFFF;
-    private static final int COLOR_NETHER     = 0xFF5555;
-    private static final int COLOR_END        = 0xAA55FF;
+    private static final int COLOR_SPAWN = 0x55FFFF;
+    private static final int COLOR_NETHER = 0xFF5555;
+    private static final int COLOR_END = 0xAA55FF;
 
     // ==== Session tracking for transitions ====
     private static String lastWorldId = null;
@@ -34,7 +35,7 @@ public final class WaypointAutoPoints {
     private static final Map<Identifier, Spec> SPECS = new HashMap<>();
     private static final Map<String, Set<Identifier>> TRIGGERED = new HashMap<>();
 
-        static {
+    static {
         // ====== измерения / ключевые прогресс-события ======
         put("story/enter_the_nether", "EnterNether", 0xFFAA00);
         put("story/enter_the_end", "EnterEnd", 0xAA55FF);
@@ -56,15 +57,17 @@ public final class WaypointAutoPoints {
         put("end/elytra", "Elytra", 0x55FFDD);
 
         // ====== Trial Chambers (1.21+) ======
-        // Если в твоей версии какой-то id отличается — включи лог и подставь фактический id.
+        // Если в твоей версии какой-то id отличается — включи лог и подставь
+        // фактический id.
         put("adventure/minecraft_trials_edition", "TrialChambers", 0x55FFFF);
         put("adventure/under_lock_and_key", "TrialVault", 0x66FFCC);
         put("adventure/revaulting", "OminousVault", 0x66CCFF);
 
-        // ====== Полезные “прокси” (не строго структура, но часто привязано к месту) ======
+        // ====== Полезные “прокси” (не строго структура, но часто привязано к месту)
+        // ======
         put("adventure/voluntary_exile", "PillagerCaptain", 0xBBBBBB); // часто возле аванпоста/патруля
-        put("adventure/hero_of_the_village", "RaidWin", 0x55FF55);     // деревня
-        put("adventure/totem_of_undying", "Evoker", 0xFFFF55);         // рейд/особняк
+        put("adventure/hero_of_the_village", "RaidWin", 0x55FF55); // деревня
+        put("adventure/totem_of_undying", "Evoker", 0xFFFF55); // рейд/особняк
 
         // Deep Dark “прокси”
         put("adventure/avoid_vibration", "DeepDark", 0x5577FF);
@@ -74,11 +77,13 @@ public final class WaypointAutoPoints {
         put("adventure/use_lodestone", "Lodestone", 0x55FFFF);
     }
 
-    private record Spec(String name, int color) {}
+    private record Spec(String name, int color) {
+    }
 
     private static void put(String advId, String wpName, int color) {
         SPECS.put(Identifier.parse(advId), new Spec(wpName, color));
     }
+
     public static void init() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> resetSession());
         ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
@@ -88,7 +93,8 @@ public final class WaypointAutoPoints {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
             Minecraft mc = Minecraft.getInstance();
-            if (mc.player == null || mc.level == null) return;
+            if (mc.player == null || mc.level == null)
+                return;
 
             String world = WaypointStorage.currentWorldId(mc);
             String dim = WaypointStorage.currentDimId(mc);
@@ -149,10 +155,13 @@ public final class WaypointAutoPoints {
      * progressUpdates: только обновлённые ачивки.
      */
     public static void onAdvancementProgressUpdate(Map<Identifier, AdvancementProgress> progressUpdates) {
-        if (!WaypointStorage.isAutoPointsEnabled()) return;
+        if (!WaypointStorage.isAutoPointsEnabled())
+            return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        if (progressUpdates == null || progressUpdates.isEmpty()) return;
+        if (mc.player == null || mc.level == null)
+            return;
+        if (progressUpdates == null || progressUpdates.isEmpty())
+            return;
 
         String worldKey = WaypointStorage.currentWorldId(mc);
         Set<Identifier> seen = TRIGGERED.computeIfAbsent(worldKey, k -> new HashSet<>());
@@ -160,12 +169,16 @@ public final class WaypointAutoPoints {
         for (var e : progressUpdates.entrySet()) {
             Identifier id = e.getKey();
             AdvancementProgress prog = e.getValue();
-            if (id == null || prog == null) continue;
+            if (id == null || prog == null)
+                continue;
 
             Spec spec = SPECS.get(id);
-            if (spec == null) continue;
-            if (seen.contains(id)) continue;
-            if (!prog.isDone()) continue;
+            if (spec == null)
+                continue;
+            if (seen.contains(id))
+                continue;
+            if (!prog.isDone())
+                continue;
 
             int x = Mth.floor(mc.player.getX());
             int y = Mth.floor(mc.player.getY());
@@ -183,7 +196,8 @@ public final class WaypointAutoPoints {
 
     private static void createOnce(Minecraft mc, String name, int color, int x, int y, int z) {
         for (var w : WaypointStorage.listForCurrentAll(mc)) {
-            if (w.name != null && w.name.equalsIgnoreCase(name)) return;
+            if (w.name != null && w.name.equalsIgnoreCase(name))
+                return;
         }
         WaypointStorage.set(mc, name, x, y, z, color);
     }
@@ -191,16 +205,19 @@ public final class WaypointAutoPoints {
     private static String shortDim(String dimId) {
         String s = dimId.toLowerCase(Locale.ROOT);
         int idx = s.lastIndexOf("minecraft:");
-        if (idx >= 0) s = s.substring(idx + "minecraft:".length());
+        if (idx >= 0)
+            s = s.substring(idx + "minecraft:".length());
         s = s.replace("]", "")
-             .replace("resourcekey[minecraft:dimension / ", "")
-             .trim();
-        if (s.isEmpty()) s = "unknown";
+                .replace("resourcekey[minecraft:dimension / ", "")
+                .trim();
+        if (s.isEmpty())
+            s = "unknown";
         return s;
     }
 
     private static BlockPos tryGetSpawnPos(Minecraft mc) {
-        if (mc == null || mc.level == null) return null;
+        if (mc == null || mc.level == null)
+            return null;
 
         Object level = mc.level;
 
@@ -209,30 +226,30 @@ public final class WaypointAutoPoints {
                 "getSharedSpawnPos",
                 "getSharedSpawnPosition",
                 "getSpawnPos",
-                "getSpawnPosition"
-        );
-        if (p != null) return p;
+                "getSpawnPosition");
+        if (p != null)
+            return p;
 
         // 2) Пробуем LevelData / world data
         Object levelData = invokeNoArgs(level, Object.class,
                 "getLevelData",
                 "getLevelDataUnsafe",
-                "getWorldData"
-        );
+                "getWorldData");
 
         if (levelData != null) {
             p = (BlockPos) invokeNoArgs(levelData, BlockPos.class,
                     "getSpawnPos",
-                    "getSpawnPosition"
-            );
-            if (p != null) return p;
+                    "getSpawnPosition");
+            if (p != null)
+                return p;
 
             // 3) Пробуем координаты спавна по отдельности
             Integer x = (Integer) invokeNoArgs(levelData, Integer.class, "getXSpawn", "getSpawnX");
             Integer y = (Integer) invokeNoArgs(levelData, Integer.class, "getYSpawn", "getSpawnY");
             Integer z = (Integer) invokeNoArgs(levelData, Integer.class, "getZSpawn", "getSpawnZ");
 
-            if (x != null && y != null && z != null) return new BlockPos(x, y, z);
+            if (x != null && y != null && z != null)
+                return new BlockPos(x, y, z);
         }
 
         return null;
@@ -243,8 +260,10 @@ public final class WaypointAutoPoints {
             try {
                 Method m = target.getClass().getMethod(n);
                 Object r = m.invoke(target);
-                if (r != null && expected.isInstance(r)) return r;
-            } catch (Throwable ignored) {}
+                if (r != null && expected.isInstance(r))
+                    return r;
+            } catch (Throwable ignored) {
+            }
         }
         return null;
     }

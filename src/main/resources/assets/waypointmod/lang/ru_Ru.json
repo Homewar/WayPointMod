@@ -1,0 +1,40 @@
+{
+  "key.waypointmod.hud_next": "HUD следующая страница",
+  "key.waypointmod.hud_prev": "HUD предыдущая страница",
+  "key.category.waypointmod.waypointmod": "Waypoints",
+  "key.waypointmod.open_gui": "Открыть метки",
+
+
+  "screen.waypointmod.prev": "Пред",
+  "screen.waypointmod.next": "След",
+  "screen.waypointmod.title": "Waypoints",
+  "screen.waypointmod.search": "Поиск",
+  "screen.waypointmod.add": "Добавить",
+  "screen.waypointmod.edit": "Редактировать",
+  "screen.waypointmod.delete": "Удалить",
+  "screen.waypointmod.hide": "Скрыть",
+  "screen.waypointmod.show": "Показать",
+  "screen.waypointmod.send": "Отправить",
+  "screen.waypointmod.toggle": "Переключить",
+  "screen.waypointmod.on": "Маркеры включены",
+  "screen.waypointmod.off": "Маркеры выключены",
+
+  "screen.waypointmod.edit_title": "Редактировать метку",
+  "screen.waypointmod.save": "Сохранить",
+  "screen.waypointmod.cancel": "Отмена",
+  "screen.waypointmod.name": "Имя",
+  "screen.waypointmod.xyz": "X / Y / Z",
+  "screen.waypointmod.color": "Цвет (#RRGGBB)",
+  "screen.waypointmod.auto_points": "Авто точки",
+  "screen.waypointmod.auto_points.on": "Авто точки: Включены",
+  "screen.waypointmod.auto_points.off": "Авто точки: Выключены",
+  "screen.waypointmod.color.random": "Случайный",
+  "screen.waypointmod.color.auto": "Авто",
+  "screen.waypointmod.color.reset": "Сбросить",
+  "screen.waypointmod.color.auto_on": "АВТО",
+  "screen.waypointmod.back": "Назад",
+  "screen.waypointmod.settings": "Настройки Waypoint Mod",
+  "key.waypointmod.quick_create": "Быстрое создание метки"
+}
+
+

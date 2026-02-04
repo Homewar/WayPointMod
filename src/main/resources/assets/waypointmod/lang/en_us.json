@@ -28,7 +28,14 @@
   "screen.waypointmod.color": "Color (#RRGGBB)",
   "screen.waypointmod.auto_points": "Auto Points",
   "screen.waypointmod.auto_points.on": "Auto Points: Enabled",
-  "screen.waypointmod.auto_points.off": "Auto Points: Disabled"
+  "screen.waypointmod.auto_points.off": "Auto Points: Disabled",
+  "screen.waypointmod.color.random": "Random",
+  "screen.waypointmod.color.auto": "Auto",
+  "screen.waypointmod.color.reset": "Reset",
+  "screen.waypointmod.color.auto_on": "AUTO",
+  "screen.waypointmod.back": "Back",
+  "screen.waypointmod.settings": "Waypoint Mod Settings",
+  "key.waypointmod.quick_create": "Quick Create Waypoint"
 }
 
 

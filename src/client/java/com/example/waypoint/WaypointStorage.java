@@ -23,27 +23,116 @@ public final class WaypointStorage {
 
     private static boolean enabled = true;
     private static int deathLimit = 3;
-    private static boolean autoPointsEnabled = true;
-    public static boolean isAutoPointsEnabled() { return autoPointsEnabled; }
-    public static void toggleAutoPoints() { autoPointsEnabled = !autoPointsEnabled; save(); }
-    public static void setAutoPointsEnabled(boolean v) { autoPointsEnabled = v; save(); }
 
+    // HUD master + per-HUD toggles
+    public static void setAutoPointsEnabled(boolean v) {
+        autoPointsEnabled = v;
+        save();
+    }
+
+    public static boolean isHudEnabled() {
+        return hudEnabled;
+    }
+
+    public static void toggleHudEnabled() {
+        hudEnabled = !hudEnabled;
+        save();
+    }
+
+    public static boolean isLocatorHudEnabled() {
+        return locatorHudEnabled;
+    }
+
+    public static void toggleLocatorHudEnabled() {
+        locatorHudEnabled = !locatorHudEnabled;
+        save();
+    }
+
+    public static boolean isWaypointHudEnabled() {
+        return waypointHudEnabled;
+    }
+
+    public static void toggleWaypointHudEnabled() {
+        waypointHudEnabled = !waypointHudEnabled;
+        save();
+    }
+
+    public static boolean isAutoPointsEnabled() {
+        return autoPointsEnabled;
+    }
+
+    public static void toggleAutoPoints() {
+        autoPointsEnabled = !autoPointsEnabled;
+        save();
+    }
+
+    // locator elements
+    public static boolean isLocatorShowTicks() {
+        return locatorShowTicks;
+    }
+
+    public static void toggleLocatorShowTicks() {
+        locatorShowTicks = !locatorShowTicks;
+        save();
+    }
+
+    public static boolean isLocatorShowDirections() {
+        return locatorShowDirections;
+    }
+
+    public static void toggleLocatorShowDirections() {
+        locatorShowDirections = !locatorShowDirections;
+        save();
+    }
+
+    public static boolean isLocatorShowMarkers() {
+        return locatorShowMarkers;
+    }
+
+    public static void toggleLocatorShowMarkers() {
+        locatorShowMarkers = !locatorShowMarkers;
+        save();
+    }
+
+    public static boolean isLocatorUseFlatBar() {
+        return locatorUseFlatBar;
+    }
+
+    public static void toggleLocatorUseFlatBar() {
+        locatorUseFlatBar = !locatorUseFlatBar;
+        save();
+    }
+
+    // HUD master + per-HUD toggles
+    private static boolean hudEnabled = true; // полное отключение всех HUD
+    private static boolean locatorHudEnabled = true; // локатор (верхний компас)
+    private static boolean waypointHudEnabled = false; // список WaypointHud (слева)
+
+    // Auto points
+    private static boolean autoPointsEnabled = true;
+
+    // Locator elements
+    private static boolean locatorShowTicks = true; // риски с градусами
+    private static boolean locatorShowDirections = true; // N/NE/E...
+    private static boolean locatorShowMarkers = true; // метки (кластеры)
+    private static boolean locatorUseFlatBar = false; // вместо рисок — горизонтальная полоса
 
     private static final List<Waypoint> all = new ArrayList<>();
 
-    private WaypointStorage() {}
+    private WaypointStorage() {
+    }
 
     public static final class Waypoint {
         public String name;
         public String world;
         public String dimension;
-        public String kind;      // "normal" | "death"
+        public String kind; // "normal" | "death"
 
         public int x, y, z;
-        public int color;        // 0xRRGGBB
-        
-        public long createdAt;   // millis
-        
+        public int color; // 0xRRGGBB
+
+        public long createdAt; // millis
+
         public boolean hidden;
         public boolean favorite;
 
@@ -58,10 +147,18 @@ public final class WaypointStorage {
         }
     }
 
-    public static void toggle() { enabled = !enabled; save(); }
-    public static boolean isEnabled() { return enabled; }
+    public static void toggle() {
+        enabled = !enabled;
+        save();
+    }
 
-    public static int getDeathLimit() { return deathLimit; }
+    public static boolean isEnabled() {
+        return enabled;
+    }
+
+    public static int getDeathLimit() {
+        return deathLimit;
+    }
 
     public static void setDeathLimit(int limit) {
         deathLimit = Math.max(0, Math.min(50, limit));
@@ -70,7 +167,8 @@ public final class WaypointStorage {
 
     public static void addHere(Minecraft mc, String name, Integer maybeColor) {
         ensureAssigned(mc);
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -93,7 +191,8 @@ public final class WaypointStorage {
 
     public static void set(Minecraft mc, String name, int x, int y, int z, Integer maybeColor) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -112,19 +211,23 @@ public final class WaypointStorage {
 
     public static boolean remove(Minecraft mc, String name) {
         ensureAssigned(mc);
-        if (mc.level == null) return false;
+        if (mc.level == null)
+            return false;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
 
-        boolean ok = all.removeIf(w -> world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name));
-        if (ok) save();
+        boolean ok = all
+                .removeIf(w -> world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name));
+        if (ok)
+            save();
         return ok;
     }
 
     public static void clear(Minecraft mc) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -134,9 +237,11 @@ public final class WaypointStorage {
     }
 
     public static void addDeath(Minecraft mc) {
-        if (deathLimit <= 0) return;
+        if (deathLimit <= 0)
+            return;
         ensureAssigned(mc);
-        if (mc.player == null || mc.level == null) return;
+        if (mc.player == null || mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -178,11 +283,12 @@ public final class WaypointStorage {
     }
 
     public static String currentDimId(Minecraft mc) {
-        if (mc.level == null) return "unknown";
+        if (mc.level == null)
+            return "unknown";
         return mc.level.dimension().toString();
-        }
+    }
 
-        public static String currentWorldId(Minecraft mc) {
+    public static String currentWorldId(Minecraft mc) {
         MinecraftServer server = mc.getSingleplayerServer();
         if (server != null) {
             Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
@@ -204,19 +310,23 @@ public final class WaypointStorage {
 
     private static long readWorldSeed(Path worldRoot) {
         Path levelDat = worldRoot.resolve("level.dat");
-        if (!Files.exists(levelDat)) return -1L;
+        if (!Files.exists(levelDat))
+            return -1L;
 
         try (InputStream in = Files.newInputStream(levelDat)) {
             // Очень большой лимит, чтобы точно не упереться в ограничения
             CompoundTag root = NbtIo.readCompressed(in, NbtAccounter.unlimitedHeap());
-            if (root == null) return -1L;
+            if (root == null)
+                return -1L;
 
             // root.getCompound(...) -> Optional<CompoundTag>
             CompoundTag data = root.getCompound("Data").orElse(null);
-            if (data == null) return -1L;
+            if (data == null)
+                return -1L;
 
             CompoundTag wgs = data.getCompound("WorldGenSettings").orElse(null);
-            if (wgs == null) return -1L;
+            if (wgs == null)
+                return -1L;
 
             // wgs.getLong("seed") -> Optional<Long>
             return wgs.getLong("seed").orElse(-1L);
@@ -229,8 +339,9 @@ public final class WaypointStorage {
         all.clear();
         enabled = true;
         deathLimit = 3;
-        
-        if (!Files.exists(FILE)) return;
+
+        if (!Files.exists(FILE))
+            return;
 
         try {
             String json = Files.readString(FILE, StandardCharsets.UTF_8);
@@ -238,12 +349,22 @@ public final class WaypointStorage {
 
             enabled = root.has("enabled") && root.get("enabled").getAsBoolean();
             deathLimit = root.has("deathLimit") ? root.get("deathLimit").getAsInt() : 3;
-            autoPointsEnabled = !root.has("autoPointsEnabled") || root.get("autoPointsEnabled").getAsBoolean();
+            hudEnabled = root.has("hudEnabled") ? root.get("hudEnabled").getAsBoolean() : true;
+            locatorHudEnabled = root.has("locatorHudEnabled") ? root.get("locatorHudEnabled").getAsBoolean() : true;
+            waypointHudEnabled = root.has("waypointHudEnabled") ? root.get("waypointHudEnabled").getAsBoolean() : false;
 
+            autoPointsEnabled = root.has("autoPointsEnabled") ? root.get("autoPointsEnabled").getAsBoolean() : true;
+
+            locatorShowTicks = root.has("locatorShowTicks") ? root.get("locatorShowTicks").getAsBoolean() : true;
+            locatorShowDirections = root.has("locatorShowDirections") ? root.get("locatorShowDirections").getAsBoolean()
+                    : true;
+            locatorShowMarkers = root.has("locatorShowMarkers") ? root.get("locatorShowMarkers").getAsBoolean() : true;
+            locatorUseFlatBar = root.has("locatorUseFlatBar") ? root.get("locatorUseFlatBar").getAsBoolean() : false;
 
             if (root.has("waypoints") && root.get("waypoints").isJsonArray()) {
                 for (JsonElement e : root.getAsJsonArray("waypoints")) {
-                    if (!e.isJsonObject()) continue;
+                    if (!e.isJsonObject())
+                        continue;
                     JsonObject o = e.getAsJsonObject();
 
                     String name = optString(o, "name", "wp");
@@ -282,7 +403,14 @@ public final class WaypointStorage {
             JsonObject root = new JsonObject();
             root.addProperty("enabled", enabled);
             root.addProperty("deathLimit", deathLimit);
+            root.addProperty("hudEnabled", hudEnabled);
+            root.addProperty("locatorHudEnabled", locatorHudEnabled);
+            root.addProperty("waypointHudEnabled", waypointHudEnabled);
             root.addProperty("autoPointsEnabled", autoPointsEnabled);
+            root.addProperty("locatorShowTicks", locatorShowTicks);
+            root.addProperty("locatorShowDirections", locatorShowDirections);
+            root.addProperty("locatorShowMarkers", locatorShowMarkers);
+            root.addProperty("locatorUseFlatBar", locatorUseFlatBar);
 
             JsonArray arr = new JsonArray();
             for (var w : all) {
@@ -308,14 +436,15 @@ public final class WaypointStorage {
                     StandardCharsets.UTF_8,
                     StandardOpenOption.CREATE,
                     StandardOpenOption.TRUNCATE_EXISTING,
-                    StandardOpenOption.WRITE
-            );
-        } catch (IOException ignored) {}
+                    StandardOpenOption.WRITE);
+        } catch (IOException ignored) {
+        }
     }
 
     public static void clearDeaths(Minecraft mc) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -326,7 +455,8 @@ public final class WaypointStorage {
 
     private static void ensureAssigned(Minecraft mc) {
         String world = currentWorldId(mc);
-        if (world.equals("unknown")) return;
+        if (world.equals("unknown"))
+            return;
 
         boolean changed = false;
         for (var w : all) {
@@ -335,7 +465,8 @@ public final class WaypointStorage {
                 changed = true;
             }
         }
-        if (changed) save();
+        if (changed)
+            save();
     }
 
     private static String optString(JsonObject o, String k, String def) {
@@ -362,30 +493,36 @@ public final class WaypointStorage {
 
     public static List<Waypoint> listForCurrentAll(Minecraft mc) {
         ensureAssigned(mc);
-        if (mc.level == null) return List.of();
+        if (mc.level == null)
+            return List.of();
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
 
         ArrayList<Waypoint> out = new ArrayList<>();
         for (var w : all) {
-            if (world.equals(w.world) && dim.equals(w.dimension)) out.add(w);
+            if (world.equals(w.world) && dim.equals(w.dimension))
+                out.add(w);
         }
         return out;
     }
 
     public static List<Waypoint> listForCurrent(Minecraft mc) {
         List<Waypoint> cur = listForCurrentAll(mc);
-        if (cur.isEmpty()) return cur;
+        if (cur.isEmpty())
+            return cur;
 
         ArrayList<Waypoint> out = new ArrayList<>(cur.size());
-        for (var w : cur) if (!w.hidden) out.add(w);
+        for (var w : cur)
+            if (!w.hidden)
+                out.add(w);
         return out;
     }
 
     public static void setHidden(Minecraft mc, String name, boolean hidden) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -399,12 +536,14 @@ public final class WaypointStorage {
                 }
             }
         }
-        if (changed) save();
+        if (changed)
+            save();
     }
 
     public static void toggleHidden(Minecraft mc, String name) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);
@@ -419,27 +558,30 @@ public final class WaypointStorage {
     }
 
     public static void setFavorite(Minecraft mc, String name, boolean favorite) {
-    ensureAssigned(mc);
-    if (mc.level == null) return;
+        ensureAssigned(mc);
+        if (mc.level == null)
+            return;
 
-    String world = currentWorldId(mc);
-    String dim = currentDimId(mc);
+        String world = currentWorldId(mc);
+        String dim = currentDimId(mc);
 
-    boolean changed = false;
-    for (var w : all) {
-        if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
-            if (w.favorite != favorite) {
-                w.favorite = favorite;
-                changed = true;
+        boolean changed = false;
+        for (var w : all) {
+            if (world.equals(w.world) && dim.equals(w.dimension) && w.name.equalsIgnoreCase(name)) {
+                if (w.favorite != favorite) {
+                    w.favorite = favorite;
+                    changed = true;
+                }
             }
         }
-    }
-    if (changed) save();
+        if (changed)
+            save();
     }
 
     public static void toggleFavorite(Minecraft mc, String name) {
         ensureAssigned(mc);
-        if (mc.level == null) return;
+        if (mc.level == null)
+            return;
 
         String world = currentWorldId(mc);
         String dim = currentDimId(mc);

@@ -5,93 +5,151 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
 public final class WaypointLocatorHud {
+
     // Vanilla bar width
     private static final int BAR_W = 182;
 
-    // Marker appearance
-    private static final int MARKER_TOP_OFFSET = 12;
+    // Place compass at top
+    private static final int BAR_TOP_Y = 7;
+    private static final int BAR_H = 18;
+
+    // Show waypoints only in 120° like vanilla player indicators
+    private static final float VIEW_DEG = 120.0f;
+    private static final float HALF_VIEW_DEG = VIEW_DEG / 2.0f; // 60
+
+    // Angular fade near edges of 120° window
+    private static final float ANGLE_FADE_START = 52.0f;
+    private static final float ANGLE_FADE_END = 60.0f;
+
+    // Compass scale window across the bar (for orientation)
+    private static final float COMPASS_VIEW_DEG = 180.0f;
+    private static final float COMPASS_HALF_VIEW = COMPASS_VIEW_DEG / 2.0f;
+
+    // Compass ticks/labels
+    private static final int COMPASS_MINOR_EVERY = 5;
+    private static final int COMPASS_MAJOR_EVERY = 15;
+    private static final int COMPASS_LABEL_EVERY = 45;
+
+    private static final int COMPASS_TICK_Y = 2;
+    private static final int COMPASS_MINOR_H = 4;
+    private static final int COMPASS_MAJOR_H = 7;
+
+    private static final int COMPASS_LABEL_Y = -5;
+
+    // Marker appearance (waypoints)
     private static final int MARKER_W = 3;
     private static final int MARKER_H = 8;
 
-    // Group markers into X-bins (reduces overlap/jitter at long distances)
-    private static final int BIN_W = 5; // px per bin (4..6 works well)
-    private static final int MAX_MARKERS = 24;
+    // Marker position inside bar
+    private static final int MARKER_INSET_BOTTOM = 4;
+
+    // Group markers into X-bins
+    private static final int BIN_W = 7;
+    private static final int MAX_MARKERS = 64;
 
     // Center label
-    private static final int CENTER_SNAP_PX = 6;         // considered "centered" if |x-center| <=
-    private static final int CENTER_RELEASE_PX = 10;     // hysteresis: release lock when beyond this
-    private static final int CENTER_TEXT_Y_OFFSET = 22;
+    private static final int CENTER_SNAP_PX = 6;
+    private static final int CENTER_RELEASE_PX = 10;
+    private static final int CENTER_LABEL_Y_GAP = 4;
+    private static final int CENTER_NAME_MAX = 14;
 
-    private static final int HOVER_SHRINK_X = 1; // с каждой стороны
+    // Hover hitbox shrink
+    private static final int HOVER_SHRINK_X = 1;
     private static final int HOVER_SHRINK_Y = 1;
 
-
     // Smooth movement of markers on bar
-    private static final float SMOOTH = 0.35f; // 0..1; higher = snappier, lower = smoother
+    private static final float SMOOTH = 0.35f;
 
-    // Distance fade (alpha)
-    private static final float FADE_START = 250f;
-    private static final float FADE_END   = 2000f;
+    // Hysteresis for bin clustering
+    private static final int BIN_HYST_PX = 3;
+    private static final Map<String, Integer> STICKY_BIN = new HashMap<>();
+
+    // Center label list limits
+    private static final int CENTER_LIST_MAX_LINES = 5;
+    private static final int CENTER_LIST_LINE_H = 10;
+
+    // Scale of text
+    private static final float CENTER_LABEL_SCALE = 0.75f; // 75% размера
+    private static final float COMPASS_LABEL_SCALE = 0.7f; // 70% размера
+
+    // + добавь константу (рядом с CENTER_*):
+    private static final int CENTER_COLLAPSED_LINES = 1; // сколько строк показывать без Shift
 
     private static final Identifier HUD_ID = Objects.requireNonNull(
-            Identifier.tryParse("waypointmod:waypoint_locator_hud")
-    );
+            Identifier.tryParse("waypointmod:waypoint_locator_hud"));
 
-    // Per-waypoint smoothed X to reduce micro-jitter
     private static final Map<String, Float> SMOOTH_X = new HashMap<>();
-
-    // Center lock to avoid jumping between nearby candidates
     private static String CENTER_LOCK_KEY = null;
 
-    private WaypointLocatorHud() {}
+    private WaypointLocatorHud() {
+    }
 
     public static void init() {
         HudElementRegistry.attachElementAfter(VanillaHudElements.INFO_BAR, HUD_ID, WaypointLocatorHud::render);
     }
 
     private static void render(GuiGraphics g, DeltaTracker delta) {
+        if (!WaypointStorage.isHudEnabled())
+            return;
+        if (!WaypointStorage.isLocatorHudEnabled())
+            return;
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null) return;
-        if (mc.options.hideGui) return;
-        if (!WaypointStorage.isEnabled()) return;
+        if (mc.player == null || mc.level == null)
+            return;
+        if (mc.options.hideGui)
+            return;
+        if (!WaypointStorage.isEnabled())
+            return;
 
         List<WaypointStorage.Waypoint> wps = WaypointStorage.listForCurrent(mc);
-        if (wps.isEmpty()) return;
 
         int sw = mc.getWindow().getGuiScaledWidth();
-        int sh = mc.getWindow().getGuiScaledHeight();
 
         int barX = (sw - BAR_W) / 2;
-        int barY = sh - 32;
+        int barY = BAR_TOP_Y;
 
         int centerX = barX + BAR_W / 2;
-        int markerTop = barY - MARKER_TOP_OFFSET;
+
+        // compass scale (no bg)
+        if (WaypointStorage.isLocatorUseFlatBar()) {
+            // простая горизонтальная линия по центру бара
+            // int barBottom = barY + BAR_H;
+            int yLine = barY + 6;
+            g.fill(barX + 1, yLine, barX + BAR_W - 1, yLine + 1, 0xFFFFFFFF);
+        } else if (WaypointStorage.isLocatorShowTicks() || WaypointStorage.isLocatorShowDirections()) {
+            drawCompassScale(g, mc, barX, barY, centerX);
+        }
+
+        // marker vertical placement within bar
+        int barBottom = barY + BAR_H;
+        int markerY2 = barBottom - MARKER_INSET_BOTTOM;
 
         int mouseX = scaledMouseX(mc);
         int mouseY = scaledMouseY(mc);
 
-        // Bin best candidates: binIndex -> best candidate (closest distance)
         int bins = Math.max(1, BAR_W / BIN_W + 2);
-        Candidate[] bestByBin = new Candidate[bins];
+        Cluster[] clusters = new Cluster[bins];
 
-        // Also track hovered (after rendering we’ll test)
-        Candidate hovered = null;
-
-        // Fill bins
+        // Fill clusters
         int count = 0;
         for (WaypointStorage.Waypoint w : wps) {
-            if (w == null) continue;
-            if (count++ >= MAX_MARKERS) break;
+            if (w == null)
+                continue;
+            if (w.hidden)
+                continue;
+            if (count++ >= MAX_MARKERS)
+                break;
 
             double dx = (w.x + 0.5) - mc.player.getX();
             double dz = (w.z + 0.5) - mc.player.getZ();
@@ -103,191 +161,420 @@ public final class WaypointLocatorHud {
             float playerYaw = mc.player.getYRot();
             float deltaYaw = Mth.wrapDegrees(toYaw - playerYaw); // [-180..180]
 
-            float t = deltaYaw / 180.0f; // [-1..1]
+            // clamp to waypoint view window (±60)
+            boolean clamped = false;
+            float visYaw = deltaYaw;
+            if (visYaw < -HALF_VIEW_DEG) {
+                visYaw = -HALF_VIEW_DEG;
+                clamped = true;
+            }
+            if (visYaw > HALF_VIEW_DEG) {
+                visYaw = HALF_VIEW_DEG;
+                clamped = true;
+            }
+
+            float t = visYaw / HALF_VIEW_DEG; // [-1..1]
             float rawX = centerX + (t * (BAR_W / 2f));
 
-            // clamp into bar
-            boolean clamped = false;
+            // clamp to bar
             float minX = barX + 1;
             float maxX = barX + BAR_W - 2;
-            if (rawX < minX) { rawX = minX; clamped = true; }
-            if (rawX > maxX) { rawX = maxX; clamped = true; }
+            if (rawX < minX)
+                rawX = minX;
+            if (rawX > maxX)
+                rawX = maxX;
 
             float dist = (float) Math.sqrt(dx * dx + dz * dz);
 
-            // Smooth X per waypoint
-            String key = keyOf(mc, w);
-            float x = smoothX(key, rawX);
+            String wpKey = keyOf(mc, w);
 
-            int bin = Mth.clamp((int) ((x - barX) / BIN_W), 0, bins - 1);
-            Candidate c = new Candidate(w, key, x, dist, clamped);
+            // сглаживание только для отрисовки
+            float xSmooth = smoothX(wpKey, rawX);
 
-            Candidate prev = bestByBin[bin];
-            if (prev == null || c.dist < prev.dist) {
-                bestByBin[bin] = c;
+            // целевой бин по rawX
+            int targetBin = Mth.clamp((int) ((rawX - barX) / BIN_W), 0, bins - 1);
+
+            // липкий бин с гистерезисом
+            int bin = targetBin;
+            Integer prev = STICKY_BIN.get(wpKey);
+            if (prev != null && prev >= 0 && prev < bins) {
+                float prevMin = (barX + prev * BIN_W) - BIN_HYST_PX;
+                float prevMax = (barX + (prev + 1) * BIN_W) + BIN_HYST_PX;
+                if (rawX >= prevMin && rawX < prevMax) {
+                    bin = prev; // держим старый бин
+                } else {
+                    STICKY_BIN.put(wpKey, targetBin); // переключаемся только когда реально вышли
+                }
+            } else {
+                STICKY_BIN.put(wpKey, targetBin);
             }
+
+            if (clusters[bin] == null)
+                clusters[bin] = new Cluster(bin, barX);
+            clusters[bin].add(new Entry(w, wpKey, xSmooth, dist, clamped, Math.abs(visYaw)));
         }
 
-        // Choose center candidate with hysteresis
-        Candidate centerBest = null;
+        Cluster hovered = null;
+
+        // center lock
+        Cluster centerBest = null;
         int centerBestDx = Integer.MAX_VALUE;
 
         if (CENTER_LOCK_KEY != null) {
-            // try to keep locked candidate if it still exists and is near center
-            Candidate locked = findCandidate(bestByBin, CENTER_LOCK_KEY);
+            Cluster locked = findClusterByKey(clusters, CENTER_LOCK_KEY);
             if (locked != null) {
-                int dx = Math.abs(Math.round(locked.x) - centerX);
+                int dx = Math.abs(locked.drawX - centerX);
                 if (dx <= CENTER_RELEASE_PX) {
                     centerBest = locked;
                     centerBestDx = dx;
                 } else {
-                    CENTER_LOCK_KEY = null; // release lock
+                    CENTER_LOCK_KEY = null;
                 }
             } else {
                 CENTER_LOCK_KEY = null;
             }
         }
 
-        // Render markers + compute hover + compute centerBest if not locked
-        for (Candidate c : bestByBin) {
-            if (c == null) continue;
+        // render clusters
+        if (WaypointStorage.isLocatorShowMarkers()) {
+            for (Cluster c : clusters) {
+                if (c == null)
+                    continue;
 
-            float alpha = fade(c.dist);
-            int argb = applyAlpha(0xFF000000 | (c.w.color & 0xFFFFFF), alpha);
+                c.finalizeCluster();
 
-            int h = c.clamped ? (MARKER_H - 2) : MARKER_H;
-            int y1 = markerTop;
-            int y2 = markerTop + h;
+                float alpha = 1.0f; // fadeByDistance(c.nearestDist);
+                alpha *= fadeByAngleAbs(c.nearestAngleAbs);
 
-            int xi = Math.round(c.x);
-            int x1 = xi - (MARKER_W / 2);
-            int x2 = x1 + MARKER_W;
+                int rgb = c.clusterColorRgb();
+                int argb = applyAlpha(0xFF000000 | rgb, alpha);
 
-            g.fill(x1, y1, x2, y2, argb);
+                int h = c.anyClamped ? (MARKER_H - 2) : MARKER_H;
+                int y2 = markerY2;
+                int y1 = y2 - h;
 
-            int hx1 = x1 + HOVER_SHRINK_X;
-            int hx2 = x2 - HOVER_SHRINK_X;
-            int hy1 = y1 + HOVER_SHRINK_Y;
-            int hy2 = y2 - HOVER_SHRINK_Y;
+                int x1 = c.drawX - (MARKER_W / 2);
+                int x2 = x1 + MARKER_W;
 
-            if (mouseX >= hx1 && mouseX < hx2 && mouseY >= hy1 && mouseY < hy2) {
-                hovered = c;
-            }
+                g.fill(x1, y1, x2, y2, argb);
 
-            // center candidate pick (if not locked)
-            if (CENTER_LOCK_KEY == null) {
-                int dx = Math.abs(xi - centerX);
-                if (dx < centerBestDx || (dx == centerBestDx && (centerBest == null || c.dist < centerBest.dist))) {
-                    centerBestDx = dx;
-                    centerBest = c;
+                int hx1 = x1 + HOVER_SHRINK_X;
+                int hx2 = x2 - HOVER_SHRINK_X;
+                int hy1 = y1 + HOVER_SHRINK_Y;
+                int hy2 = y2 - HOVER_SHRINK_Y;
+
+                if (mouseX >= hx1 && mouseX < hx2 && mouseY >= hy1 && mouseY < hy2) {
+                    hovered = c;
+                }
+
+                if (CENTER_LOCK_KEY == null) {
+                    int dx = Math.abs(c.drawX - centerX);
+                    if (dx < centerBestDx || (dx == centerBestDx
+                            && c.nearestDist < (centerBest == null ? Float.MAX_VALUE : centerBest.nearestDist))) {
+                        centerBestDx = dx;
+                        centerBest = c;
+                    }
                 }
             }
+        } else {
+            // если маркеры выключены — можно сбросить lock, чтобы не залипала подпись
+            CENTER_LOCK_KEY = null;
         }
 
-        // If we have a centerBest and it is within snap range -> lock it and draw label
         if (hovered == null && centerBest != null && centerBestDx <= CENTER_SNAP_PX) {
             CENTER_LOCK_KEY = centerBest.key;
-            drawCenterLabelSmall(g, mc, centerBest, centerX, barY, sw);
-        }
-
-        // Hover tooltip (name + coords)
-        if (hovered != null) {
-            WaypointStorage.Waypoint w = hovered.w;
-            String name = (w.name == null || w.name.isBlank()) ? "(unnamed)" : w.name;
-            Component l1 = Component.literal(name);
-            Component l2 = Component.literal(w.x + " " + w.y + " " + w.z);
-            drawTooltip(g, mc, List.of(l1, l2), mouseX, mouseY);
+            drawCenterLabel(g, mc, centerBest, centerX, barY, sw);
         }
     }
 
-    // ---- Small center label (scaled) ----
-    private static void drawCenterLabelSmall(GuiGraphics g, Minecraft mc, Candidate c, int centerX, int barY, int sw) {
-        WaypointStorage.Waypoint w = c.w;
+    // ----------------- Cluster + Entry -----------------
 
-        String name = (w.name == null || w.name.isBlank()) ? "(unnamed)" : w.name;
+    private static final class Entry {
+        final WaypointStorage.Waypoint w;
+        final String wpKey;
+        final float x;
+        final float dist;
+        final boolean clamped;
+        final float angleAbs;
 
-        // более агрессивное сокращение, чтобы "мелко" выглядело и не прыгало по ширине
-        int maxLen = 14;
-        if (name.length() > maxLen) name = name.substring(0, maxLen) + "…";
-
-        int distInt = (int) Math.round(c.dist);
-
-        // компактный формат
-        String s = name + " · " + distInt + "m";
-
-        // меряем и центрируем
-        int textW = mc.font.width(s);
-        int tx = centerX - (textW / 2);
-        int ty = barY - CENTER_TEXT_Y_OFFSET;
-
-        tx = Mth.clamp(tx, 4, sw - textW - 4);
-
-        // компактный фон (тоньше)
-        int padX = 3;
-        int padY = 2;
-
-        int bx1 = tx - padX;
-        int by1 = ty - padY;
-        int bx2 = tx + textW + padX;
-        int by2 = ty + 9 + padY; // 9 вместо 10
-
-        g.fill(bx1, by1, bx2, by2, 0x90000000);
-
-        // "визуально меньше": без тени, чуть серее
-        g.drawString(mc.font, s, tx, ty, 0xFFE0E0E0, false);
-    }
-
-
-    // ---- Tooltip (manual) ----
-    private static void drawTooltip(GuiGraphics g, Minecraft mc, List<Component> lines, int mouseX, int mouseY) {
-        if (lines == null || lines.isEmpty()) return;
-
-        int sw = mc.getWindow().getGuiScaledWidth();
-        int sh = mc.getWindow().getGuiScaledHeight();
-
-        int pad = 4;
-        int lineH = 10;
-
-        int maxW = 0;
-        for (Component c : lines) maxW = Math.max(maxW, mc.font.width(c));
-
-        int boxW = maxW + pad * 2;
-        int boxH = lines.size() * lineH + pad * 2;
-
-        int x = mouseX + 10;
-        int y = mouseY + 10;
-
-        if (x + boxW > sw) x = mouseX - 10 - boxW;
-        if (y + boxH > sh) y = mouseY - 10 - boxH;
-
-        int bg = 0xF0100010;
-        int border = 0xFFFFFFFF;
-
-        g.fill(x, y, x + boxW, y + boxH, bg);
-        g.fill(x, y, x + boxW, y + 1, border);
-        g.fill(x, y + boxH - 1, x + boxW, y + boxH, border);
-        g.fill(x, y, x + 1, y + boxH, border);
-        g.fill(x + boxW - 1, y, x + boxW, y + boxH, border);
-
-        int ty = y + pad;
-        for (Component c : lines) {
-            g.drawString(mc.font, c, x + pad, ty, 0xFFFFFFFF, true);
-            ty += lineH;
+        Entry(WaypointStorage.Waypoint w, String wpKey, float x, float dist, boolean clamped, float angleAbs) {
+            this.w = w;
+            this.wpKey = wpKey;
+            this.x = x;
+            this.dist = dist;
+            this.clamped = clamped;
+            this.angleAbs = angleAbs;
         }
     }
 
-    // ---- Candidate / helpers ----
-    private record Candidate(WaypointStorage.Waypoint w, String key, float x, float dist, boolean clamped) {}
+    private static final class Cluster {
+        @SuppressWarnings("all")
+        final int bin;
+        final String key;
 
-    private static Candidate findCandidate(Candidate[] arr, String key) {
-        for (Candidate c : arr) {
-            if (c != null && c.key.equals(key)) return c;
+        final List<Entry> entries = new ArrayList<>();
+
+        int drawX;
+        float nearestDist = Float.MAX_VALUE;
+        float nearestAngleAbs = 999f;
+        boolean anyClamped = false;
+
+        Cluster(int bin, int barX) {
+            this.bin = bin;
+            this.key = "bin:" + bin;
+            this.drawX = barX + bin * BIN_W + BIN_W / 2;
+        }
+
+        void add(Entry e) {
+            entries.add(e);
+        }
+
+        void finalizeCluster() {
+            if (entries.isEmpty())
+                return;
+
+            Entry nearest = entries.get(0);
+            for (Entry e : entries) {
+                if (e.dist < nearest.dist)
+                    nearest = e;
+            }
+            this.drawX = Math.round(nearest.x);
+
+            for (Entry e : entries) {
+                if (e.dist < nearestDist)
+                    nearestDist = e.dist;
+                if (e.angleAbs < nearestAngleAbs)
+                    nearestAngleAbs = e.angleAbs;
+                if (e.clamped)
+                    anyClamped = true;
+            }
+
+            entries.sort((a, b) -> {
+                boolean af = a.w.favorite;
+                boolean bf = b.w.favorite;
+                if (af != bf)
+                    return af ? -1 : 1; // избранные выше
+                return Float.compare(a.dist, b.dist); // затем по дистанции
+            });
+        }
+
+        int clusterColorRgb() {
+            if (entries.size() == 1)
+                return entries.get(0).w.color & 0xFFFFFF;
+
+            int take = Math.min(4, entries.size());
+            long rr = 0, gg = 0, bb = 0;
+            for (int i = 0; i < take; i++) {
+                int c = entries.get(i).w.color & 0xFFFFFF;
+                rr += (c >> 16) & 255;
+                gg += (c >> 8) & 255;
+                bb += c & 255;
+            }
+            int r = (int) (rr / take);
+            int g = (int) (gg / take);
+            int b = (int) (bb / take);
+            return (r << 16) | (g << 8) | b;
+        }
+    }
+
+    private static Cluster findClusterByKey(Cluster[] arr, String key) {
+        for (Cluster c : arr) {
+            if (c != null && c.key.equals(key))
+                return c;
         }
         return null;
     }
 
+    // ----------------- Compass -----------------
+
+    private static void drawCompassScale(GuiGraphics g, Minecraft mc, int barX, int barY, int centerX) {
+        float playerYaw = mc.player.getYRot();
+
+        boolean showTicks = WaypointStorage.isLocatorShowTicks();
+        boolean showDirs = WaypointStorage.isLocatorShowDirections();
+
+        for (int deg = -180; deg <= 180; deg += COMPASS_MINOR_EVERY) {
+            float delta = Mth.wrapDegrees(deg - playerYaw);
+
+            if (delta < -COMPASS_HALF_VIEW || delta > COMPASS_HALF_VIEW)
+                continue;
+
+            float t = delta / COMPASS_HALF_VIEW;
+            int x = Math.round(centerX + t * (BAR_W / 2f));
+            if (x < barX + 1 || x > barX + BAR_W - 2)
+                continue;
+
+            // 1) риски (только если включены)
+            if (showTicks) {
+                boolean major = (deg % COMPASS_MAJOR_EVERY == 0);
+                int h = major ? COMPASS_MAJOR_H : COMPASS_MINOR_H;
+
+                int y1 = barY + COMPASS_TICK_Y;
+                int y2 = y1 + h;
+
+                g.fill(x, y1, x + 1, y2, 0xFFFFFFFF);
+            }
+
+            // 2) подписи сторон света (независимо от рисок)
+            if (showDirs && (deg % COMPASS_LABEL_EVERY == 0)) {
+                String label = compassLabel(wrap360(deg));
+                int tw = mc.font.width(label);
+
+                int tx = x - (tw / 2) + 1;
+                int ty = barY + COMPASS_LABEL_Y;
+
+                var pose = g.pose();
+                pose.pushMatrix();
+                pose.scale(COMPASS_LABEL_SCALE, COMPASS_LABEL_SCALE, pose);
+
+                int sx = Math.round(tx / COMPASS_LABEL_SCALE);
+                int sy = Math.round(ty / COMPASS_LABEL_SCALE);
+
+                g.drawString(mc.font, label, sx, sy, 0xFFFFFFFF, true);
+
+                pose.popMatrix();
+            }
+        }
+    }
+
+    private static void drawCenterLabel(GuiGraphics g, Minecraft mc, Cluster c, int centerX, int barY, int sw) {
+        final float scale = CENTER_LABEL_SCALE;
+        final int baseY = barY + BAR_H + CENTER_LABEL_Y_GAP;
+
+        // Shift = расширенный режим (держишь Shift -> раскрыто)
+        final boolean expanded = mc.options.keyShift.isDown();
+
+        // ---------- 1 waypoint: одна строка ----------
+        if (c.entries.size() == 1) {
+            Entry e = c.entries.get(0);
+
+            String name = safeName(e.w);
+            if (name.length() > CENTER_NAME_MAX)
+                name = name.substring(0, CENTER_NAME_MAX) + "…";
+            int dist = (int) Math.round(e.dist);
+
+            String s = name + " [" + dist + "m]";
+
+            int tw = mc.font.width(s);
+            int twScaled = Math.round(tw * scale);
+            int tx = Mth.clamp(centerX - twScaled / 2, 4, sw - twScaled - 4);
+
+            int sx = Math.round(tx / scale);
+            int sy = Math.round(baseY / scale);
+
+            int col = 0xFF000000 | (e.w.color & 0xFFFFFF);
+
+            var pose = g.pose();
+            if (scale != 1.0f) {
+                pose.pushMatrix();
+                pose.scale(scale, scale, pose);
+            }
+
+            g.drawString(mc.font, s, sx, sy, col, false);
+
+            if (scale != 1.0f) {
+                pose.popMatrix();
+            }
+            return;
+        }
+
+        // ---------- cluster: список строк ----------
+        int limit = expanded ? CENTER_LIST_MAX_LINES : CENTER_COLLAPSED_LINES;
+
+        int shown = Math.min(limit, c.entries.size());
+        int remaining = c.entries.size() - shown;
+
+        // если expanded, но всё равно обрезали по CENTER_LIST_MAX_LINES — тоже покажем
+        // “… +N”
+        boolean showMoreLine = remaining > 0;
+
+        int totalLines = shown + (showMoreLine ? 1 : 0);
+        String[] lines = new String[totalLines];
+        int[] colors = new int[totalLines];
+
+        int maxW = 0;
+
+        for (int i = 0; i < shown; i++) {
+            Entry e = c.entries.get(i);
+
+            String name = shrinkName(safeName(e.w), CENTER_NAME_MAX);
+            int dist = (int) Math.round(e.dist);
+
+            String s = name + " [" + dist + "m]";
+            lines[i] = s;
+            colors[i] = 0xFF000000 | (e.w.color & 0xFFFFFF);
+
+            maxW = Math.max(maxW, mc.font.width(s));
+        }
+
+        if (showMoreLine) {
+            String more = "… +" + remaining + (expanded ? "" : " (Shift)");
+            lines[totalLines - 1] = more;
+            colors[totalLines - 1] = 0xFFFFFFFF;
+            maxW = Math.max(maxW, mc.font.width(more));
+        }
+
+        int maxWScaled = Math.round(maxW * scale);
+        int tx = Mth.clamp(centerX - maxWScaled / 2, 4, sw - maxWScaled - 4);
+
+        int sx = Math.round(tx / scale);
+        int sy0 = Math.round(baseY / scale);
+
+        int lineStep = Math.round(CENTER_LIST_LINE_H / scale);
+
+        var pose = g.pose();
+        if (scale != 1.0f) {
+            pose.pushMatrix();
+            pose.scale(scale, scale, pose);
+        }
+
+        int y = sy0;
+        for (int i = 0; i < totalLines; i++) {
+            g.drawString(mc.font, lines[i], sx, y, colors[i], false);
+            y += lineStep;
+        }
+
+        if (scale != 1.0f) {
+            pose.popMatrix();
+        }
+    }
+
+    private static String shrinkName(String s, int max) {
+        if (s == null)
+            return "(unnamed)";
+        if (s.length() <= max)
+            return s;
+        return s.substring(0, Math.max(1, max - 1)) + "…";
+    }
+
+    // ----------------- Fades / math -----------------
+
+    // private static float fadeByDistance(float dist) {
+    // if (dist <= FADE_START)
+    // return 1.0f;
+    // if (dist >= FADE_END)
+    // return 0.25f;
+    // float t = (dist - FADE_START) / (FADE_END - FADE_START);
+    // return Mth.lerp(t, 1.0f, 0.25f);
+    // }
+
+    private static float fadeByAngleAbs(float angleAbs) {
+        if (angleAbs <= ANGLE_FADE_START)
+            return 1.0f;
+        if (angleAbs >= ANGLE_FADE_END)
+            return 0.0f;
+        float t = (angleAbs - ANGLE_FADE_START) / (ANGLE_FADE_END - ANGLE_FADE_START);
+        return 1.0f - t;
+    }
+
+    private static int applyAlpha(int argb, float alpha01) {
+        int a = (int) (Mth.clamp(alpha01, 0f, 1f) * 255f) & 0xFF;
+        return (a << 24) | (argb & 0x00FFFFFF);
+    }
+
+    // ----------------- Keys / smoothing -----------------
+
     private static String keyOf(Minecraft mc, WaypointStorage.Waypoint w) {
-        // stable per-world + dimension + name + coords (на случай одинаковых имён)
         String world = WaypointStorage.currentWorldId(mc);
         String dim = WaypointStorage.currentDimId(mc);
         String name = (w.name == null) ? "" : w.name;
@@ -301,17 +588,7 @@ public final class WaypointLocatorHud {
         return out;
     }
 
-    private static float fade(float dist) {
-        if (dist <= FADE_START) return 1.0f;
-        if (dist >= FADE_END) return 0.25f;
-        float t = (dist - FADE_START) / (FADE_END - FADE_START);
-        return Mth.lerp(t, 1.0f, 0.25f);
-    }
-
-    private static int applyAlpha(int argb, float alpha01) {
-        int a = (int) (Mth.clamp(alpha01, 0f, 1f) * 255f) & 0xFF;
-        return (a << 24) | (argb & 0x00FFFFFF);
-    }
+    // ----------------- Mouse scale helpers -----------------
 
     private static int scaledMouseX(Minecraft mc) {
         double raw = mc.mouseHandler.xpos();
@@ -325,5 +602,36 @@ public final class WaypointLocatorHud {
         int sh = mc.getWindow().getGuiScaledHeight();
         int rh = mc.getWindow().getScreenHeight();
         return (int) Math.floor(raw * (double) sh / (double) rh);
+    }
+
+    // ----------------- Compass labels -----------------
+
+    private static float wrap360(float deg) {
+        float d = deg % 360f;
+        if (d < 0)
+            d += 360f;
+        return d;
+    }
+
+    private static String compassLabel(float deg0to360) {
+        int d = Math.round(deg0to360 / 45f) * 45;
+        d %= 360;
+        return switch (d) {
+            case 0 -> "N";
+            case 45 -> "NE";
+            case 90 -> "E";
+            case 135 -> "SE";
+            case 180 -> "S";
+            case 225 -> "SW";
+            case 270 -> "W";
+            default -> "NW";
+        };
+    }
+
+    private static String safeName(WaypointStorage.Waypoint w) {
+        if (w == null)
+            return "(unnamed)";
+        String n = w.name;
+        return (n == null || n.isBlank()) ? "(unnamed)" : n;
     }
 }
