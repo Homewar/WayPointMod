@@ -8,6 +8,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -111,9 +112,9 @@ public final class WaypointHud {
             int dist = (int) Math.round(Math.sqrt(distSq(mc, wp)));
             String arrow = arrowTo(mc, wp);
 
-            String name = (wp.name == null) ? "(unnamed)" : wp.name;
+            String name = (wp.name == null) ? Component.translatable("screen.waypointmod.unnamed").getString() : wp.name;
             String star = wp.favorite ? "★ " : "";
-            String line = arrow + " " + star + name + " [" + dist + "m]";
+            String line = arrow + " " + star + name + Component.translatable("hud.waypointmod.distance_brackets", dist).getString();
 
             int argb = 0xFF000000 | (wp.color & 0xFFFFFF);
             g.drawString(mc.font, line, x, y, argb, true);

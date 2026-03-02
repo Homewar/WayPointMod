@@ -150,7 +150,7 @@ public class WaypointEditScreen extends Screen {
         if (x == null || y == null || z == null) return;
 
         String newName = name.getValue().trim();
-        if (newName.isEmpty()) newName = (originalNameOrNull != null ? originalNameOrNull : "New");
+        if (newName.isEmpty()) newName = (originalNameOrNull != null ? originalNameOrNull : Component.translatable("screen.waypointmod.new").getString());
 
         if (originalNameOrNull != null && !originalNameOrNull.equalsIgnoreCase(newName)) {
             WaypointStorage.remove(mc, originalNameOrNull);

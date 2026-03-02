@@ -108,22 +108,22 @@ public class WaypointScreen extends Screen {
         int tabW = (LIST_W - 6) / 4;
         int gap = 2;
 
-        tabAllBtn = Button.builder(Component.literal("Метки"), b -> setTab(Tab.ALL))
+        tabAllBtn = Button.builder(Component.translatable("screen.waypointmod.tab.all"), b -> setTab(Tab.ALL))
                 .bounds(listLeft, tabY, tabW, tabH)
                 .build();
         addRenderableWidget(tabAllBtn);
 
-        tabDeathBtn = Button.builder(Component.literal("Смерти"), b -> setTab(Tab.DEATH))
+        tabDeathBtn = Button.builder(Component.translatable("screen.waypointmod.tab.death"), b -> setTab(Tab.DEATH))
                 .bounds(listLeft + tabW + gap, tabY, tabW, tabH)
                 .build();
         addRenderableWidget(tabDeathBtn);
 
-        tabFavBtn = Button.builder(Component.literal("Избранные"), b -> setTab(Tab.FAV))
+        tabFavBtn = Button.builder(Component.translatable("screen.waypointmod.tab.fav"), b -> setTab(Tab.FAV))
                 .bounds(listLeft + (tabW + gap) * 2, tabY, tabW, tabH)
                 .build();
         addRenderableWidget(tabFavBtn);
 
-        tabGlobalBtn = Button.builder(Component.literal("Глобальные"), b -> setTab(Tab.GLOBAL))
+        tabGlobalBtn = Button.builder(Component.translatable("screen.waypointmod.tab.global"), b -> setTab(Tab.GLOBAL))
                 .bounds(listLeft + (tabW + gap) * 3, tabY, tabW, tabH)
                 .build();
         tabGlobalBtn.active = false; // future feature
@@ -151,7 +151,7 @@ public class WaypointScreen extends Screen {
                 .build();
         addRenderableWidget(settingsBtn);
 
-        doneBtn = Button.builder(Component.literal("Done"), b -> onClose())
+        doneBtn = Button.builder(Component.translatable("screen.waypointmod.done"), b -> onClose())
                 .bounds(listRight - 80, btnY, 80, 20)
                 .build();
         addRenderableWidget(doneBtn);
@@ -282,7 +282,7 @@ public class WaypointScreen extends Screen {
 
             if (!vis || w == null) continue;
 
-            String name = (w.name == null ? "(unnamed)" : w.name);
+            String name = (w.name == null ? Component.translatable("screen.waypointmod.unnamed").getString() : w.name);
             int dist = (mc.player == null) ? 0 : (int) Math.round(Math.sqrt(distSq(mc, w)));
 
             String flags = "";
@@ -293,7 +293,10 @@ public class WaypointScreen extends Screen {
             String star = w.favorite ? "★ " : "";
             int color = isDeath ? 0xFF5555 : 0xFFFFFF;
 
-            r.main.setMessage(Component.literal(star + name + flags + "  (" + dist + "m)")
+            r.main.setMessage(Component.empty()
+                    .append(Component.literal(star + name + flags + "  ("))
+                    .append(Component.translatable("screen.waypointmod.distance_m", dist))
+                    .append(Component.literal(")"))
                     .withStyle(style -> style.withColor(color)));
 
             r.eyeIcon = w.hidden ? ICO_EYE_OPEN : ICO_EYE_CLOSED;

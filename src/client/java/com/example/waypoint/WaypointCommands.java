@@ -34,7 +34,7 @@ public final class WaypointCommands {
                                     String name = StringArgumentType.getString(ctx, "name");
                                     WaypointStorage.addHere(mc, name, null);
 
-                                    ctx.getSource().sendFeedback(Component.literal("Added waypoint: " + name));
+                                    ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.added", name));
                                     return 1;
                                 })
                         ).build()
@@ -57,7 +57,7 @@ public final class WaypointCommands {
 
                                                             WaypointStorage.set(mc, name, x, y, z, null);
 
-                                                            ctx.getSource().sendFeedback(Component.literal("Set waypoint: " + name));
+                                                            ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.set", name));
                                                             return 1;
                                                         })
                                                 )
@@ -76,16 +76,13 @@ public final class WaypointCommands {
 
                     var list = WaypointStorage.listForCurrent(mc);
                     if (list.isEmpty()) {
-                        ctx.getSource().sendFeedback(Component.literal("No waypoints here."));
+                        ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.none_here"));
                         return 1;
                     }
 
-                    ctx.getSource().sendFeedback(Component.literal("Waypoints (" + worldKey + ", " + dim + "):"));
+                    ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.list_header", worldKey, dim));
                     for (var wp : list) {
-                        ctx.getSource().sendFeedback(
-                                Component.literal("- " + wp.name + " @ " + wp.x + " " + wp.y + " " + wp.z +
-                                        " #" + String.format("%06X", wp.color))
-                        );
+                        ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.list_item", wp.name, wp.x, wp.y, wp.z, String.format("%06X", wp.color)));
                     }
                     return 1;
                 }).build()
@@ -101,7 +98,7 @@ public final class WaypointCommands {
                                     String name = StringArgumentType.getString(ctx, "name");
                                     boolean ok = WaypointStorage.remove(mc, name);
 
-                                    ctx.getSource().sendFeedback(Component.literal(ok ? "Removed: " + name : "Not found: " + name));
+                                    ctx.getSource().sendFeedback(Component.translatable(ok ? "commands.waypointmod.removed" : "commands.waypointmod.not_found", name));
                                     return 1;
                                 })
                         ).build()
@@ -114,7 +111,7 @@ public final class WaypointCommands {
                             if (mc.level == null) return 0;
 
                             WaypointStorage.clear(mc);
-                            ctx.getSource().sendFeedback(Component.literal("Cleared waypoints in this world+dimension."));
+                            ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.cleared"));
                             return 1;
                         })
                         .then(literal("death")
@@ -123,7 +120,7 @@ public final class WaypointCommands {
                                     if (mc.level == null) return 0;
 
                                     WaypointStorage.clearDeaths(mc);
-                                    ctx.getSource().sendFeedback(Component.literal("Cleared death waypoints in this world+dimension."));
+                                    ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.cleared_death"));
                                     return 1;
                                 })
                         )
@@ -133,9 +130,7 @@ public final class WaypointCommands {
         root.addChild(
                 literal("toggle").executes(ctx -> {
                     WaypointStorage.toggle();
-                    ctx.getSource().sendFeedback(Component.literal(
-                            "Waypoints rendering: " + (WaypointStorage.isEnabled() ? "ON" : "OFF")
-                    ));
+                    ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.toggle", Component.translatable(WaypointStorage.isEnabled() ? "screen.waypointmod.on" : "screen.waypointmod.off")));
                     return 1;
                 }).build()
         );
@@ -155,21 +150,21 @@ public final class WaypointCommands {
                                             try {
                                                 rgb = parseRgb(hex);
                                             } catch (Exception e) {
-                                                ctx.getSource().sendFeedback(Component.literal("Bad hex. Use RRGGBB or #RRGGBB"));
+                                                ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.bad_hex"));
                                                 return 0;
                                             }
 
                                             var list = WaypointStorage.listForCurrent(mc);
                                             var found = list.stream().filter(w -> w.name.equalsIgnoreCase(name)).findFirst();
                                             if (found.isEmpty()) {
-                                                ctx.getSource().sendFeedback(Component.literal("Not found: " + name));
+                                                ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.not_found", name));
                                                 return 0;
                                             }
 
                                             var wp = found.get();
                                             WaypointStorage.set(mc, wp.name, wp.x, wp.y, wp.z, rgb);
 
-                                            ctx.getSource().sendFeedback(Component.literal("Color set for " + name));
+                                            ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.color_set", name));
                                             return 1;
                                         })
                                 )
@@ -182,7 +177,7 @@ public final class WaypointCommands {
                                 .executes(ctx -> {
                                     int n = IntegerArgumentType.getInteger(ctx, "count");
                                     WaypointStorage.setDeathLimit(n);
-                                    ctx.getSource().sendFeedback(Component.literal("Death waypoints limit: " + WaypointStorage.getDeathLimit()));
+                                    ctx.getSource().sendFeedback(Component.translatable("commands.waypointmod.deathlimit", WaypointStorage.getDeathLimit()));
                                     return 1;
                                 })
                         ).build()

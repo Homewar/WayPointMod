@@ -4,6 +4,7 @@ import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
 import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
+import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
@@ -211,7 +212,8 @@ public final class WaypointLocatorHud {
 
             if (clusters[bin] == null)
                 clusters[bin] = new Cluster(bin, barX);
-            clusters[bin].add(new Entry(w, wpKey, xSmooth, dist, clamped, Math.abs(visYaw)));
+            int yDiff = w.y - mc.player.getBlockY();
+            clusters[bin].add(new Entry(w, wpKey, xSmooth, dist, clamped, Math.abs(visYaw), yDiff));
         }
 
         Cluster hovered = null;
@@ -248,18 +250,29 @@ public final class WaypointLocatorHud {
 
                 int rgb = c.clusterColorRgb();
                 int argb = applyAlpha(0xFF000000 | rgb, alpha);
+int h = c.anyClamped ? (MARKER_H - 2) : MARKER_H;
+int y2 = markerY2;
+int y1 = y2 - h;
 
-                int h = c.anyClamped ? (MARKER_H - 2) : MARKER_H;
-                int y2 = markerY2;
-                int y1 = y2 - h;
+// Draw marker as a filled triangle:
+//   - waypoint above player: triangle points up
+//   - waypoint below player: triangle points down
+//   - same height: small rectangle
+boolean up = c.nearestYDiff > 0;
+boolean down = c.nearestYDiff < 0;
 
-                int x1 = c.drawX - (MARKER_W / 2);
-                int x2 = x1 + MARKER_W;
+int halfBase = 4; // triangle half-width in pixels
+if (up || down) {
+    fillTriangle(g, c.drawX, y1, y2, halfBase, argb, up);
+} else {
+    int x1 = c.drawX - (MARKER_W / 2);
+    int x2 = x1 + MARKER_W;
+    g.fill(x1, y1, x2, y2, argb);
+    halfBase = Math.max(halfBase, (MARKER_W + 1) / 2);
+}
 
-                g.fill(x1, y1, x2, y2, argb);
-
-                int hx1 = x1 + HOVER_SHRINK_X;
-                int hx2 = x2 - HOVER_SHRINK_X;
+int hx1 = (c.drawX - halfBase) + HOVER_SHRINK_X;
+                int hx2 = (c.drawX + halfBase + 1) - HOVER_SHRINK_X;
                 int hy1 = y1 + HOVER_SHRINK_Y;
                 int hy2 = y2 - HOVER_SHRINK_Y;
 
@@ -297,13 +310,16 @@ public final class WaypointLocatorHud {
         final boolean clamped;
         final float angleAbs;
 
-        Entry(WaypointStorage.Waypoint w, String wpKey, float x, float dist, boolean clamped, float angleAbs) {
+        final int yDiff;
+
+        Entry(WaypointStorage.Waypoint w, String wpKey, float x, float dist, boolean clamped, float angleAbs, int yDiff) {
             this.w = w;
             this.wpKey = wpKey;
             this.x = x;
             this.dist = dist;
             this.clamped = clamped;
             this.angleAbs = angleAbs;
+            this.yDiff = yDiff;
         }
     }
 
@@ -319,6 +335,8 @@ public final class WaypointLocatorHud {
         float nearestAngleAbs = 999f;
         boolean anyClamped = false;
 
+
+        int nearestYDiff = 0;
         Cluster(int bin, int barX) {
             this.bin = bin;
             this.key = "bin:" + bin;
@@ -340,6 +358,7 @@ public final class WaypointLocatorHud {
             }
             this.drawX = Math.round(nearest.x);
 
+            this.nearestYDiff = nearest.yDiff;
             for (Entry e : entries) {
                 if (e.dist < nearestDist)
                     nearestDist = e.dist;
@@ -453,7 +472,7 @@ public final class WaypointLocatorHud {
                 name = name.substring(0, CENTER_NAME_MAX) + "…";
             int dist = (int) Math.round(e.dist);
 
-            String s = name + " [" + dist + "m]";
+            String s = name + Component.translatable("hud.waypointmod.distance_brackets", dist).getString();
 
             int tw = mc.font.width(s);
             int twScaled = Math.round(tw * scale);
@@ -500,7 +519,7 @@ public final class WaypointLocatorHud {
             String name = shrinkName(safeName(e.w), CENTER_NAME_MAX);
             int dist = (int) Math.round(e.dist);
 
-            String s = name + " [" + dist + "m]";
+            String s = name + Component.translatable("hud.waypointmod.distance_brackets", dist).getString();
             lines[i] = s;
             colors[i] = 0xFF000000 | (e.w.color & 0xFFFFFF);
 
@@ -508,7 +527,7 @@ public final class WaypointLocatorHud {
         }
 
         if (showMoreLine) {
-            String more = "… +" + remaining + (expanded ? "" : " (Shift)");
+            String more = Component.translatable(expanded ? "hud.waypointmod.more.expanded" : "hud.waypointmod.more.collapsed", remaining).getString();
             lines[totalLines - 1] = more;
             colors[totalLines - 1] = 0xFFFFFFFF;
             maxW = Math.max(maxW, mc.font.width(more));
@@ -541,7 +560,7 @@ public final class WaypointLocatorHud {
 
     private static String shrinkName(String s, int max) {
         if (s == null)
-            return "(unnamed)";
+            return Component.translatable("screen.waypointmod.unnamed").getString();
         if (s.length() <= max)
             return s;
         return s.substring(0, Math.max(1, max - 1)) + "…";
@@ -604,7 +623,33 @@ public final class WaypointLocatorHud {
         return (int) Math.floor(raw * (double) sh / (double) rh);
     }
 
-    // ----------------- Compass labels -----------------
+    
+// ----------------- Triangle marker drawing -----------------
+
+private static void fillTriangle(GuiGraphics g, int cx, int y1, int y2, int halfBase, int argb, boolean up) {
+    // y1 = top, y2 = bottom (exclusive)
+    int h = y2 - y1;
+    if (h <= 0)
+        return;
+
+    // Draw 1-pixel high horizontal slices to form a filled triangle.
+    // For "up": wide base at bottom, point at top.
+    // For "down": point at bottom, wide base at top.
+    for (int i = 0; i < h; i++) {
+        float t = (h == 1) ? 1.0f : (float) i / (float) (h - 1); // 0..1 (top->bottom)
+
+        // up:   half grows from 0 (top point) to halfBase (bottom base)
+        // down: half shrinks from halfBase (top base) to 0 (bottom point)
+        int half = up ? Math.round(halfBase * t) : Math.round(halfBase * (1.0f - t));
+
+        int y = y1 + i;
+        int x1 = cx - half;
+        int x2 = cx + half + 1; // exclusive
+        g.fill(x1, y, x2, y + 1, argb);
+    }
+}
+
+// ----------------- Compass labels -----------------
 
     private static float wrap360(float deg) {
         float d = deg % 360f;
@@ -617,21 +662,24 @@ public final class WaypointLocatorHud {
         int d = Math.round(deg0to360 / 45f) * 45;
         d %= 360;
         return switch (d) {
-            case 0 -> "N";
-            case 45 -> "NE";
-            case 90 -> "E";
-            case 135 -> "SE";
-            case 180 -> "S";
-            case 225 -> "SW";
-            case 270 -> "W";
-            default -> "NW";
+            // Minecraft yaw convention:
+            // 0° = South, 90° = West, 180° = North, 270° = East
+            // (increasing yaw rotates clockwise when viewed from above).
+            case 0 -> "S";
+            case 45 -> "SW";
+            case 90 -> "W";
+            case 135 -> "NW";
+            case 180 -> "N";
+            case 225 -> "NE";
+            case 270 -> "E";
+            default -> "SE";
         };
     }
 
     private static String safeName(WaypointStorage.Waypoint w) {
         if (w == null)
-            return "(unnamed)";
+            return Component.translatable("screen.waypointmod.unnamed").getString();
         String n = w.name;
-        return (n == null || n.isBlank()) ? "(unnamed)" : n;
+        return (n == null || n.isBlank()) ? Component.translatable("screen.waypointmod.unnamed").getString() : n;
     }
 }

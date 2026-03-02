@@ -83,10 +83,10 @@ public class WaypointSettingsScreen extends Screen {
         // bottom buttons like Game Rules: Done / Cancel
         int btnW = 150;
         int btnY = this.height - 28;
-        doneBtn = Button.builder(Component.literal("Done"), b -> onDone())
+        doneBtn = Button.builder(Component.translatable("screen.waypointmod.done"), b -> onDone())
                 .bounds(cx - btnW - 5, btnY, btnW, 20)
                 .build();
-        cancelBtn = Button.builder(Component.literal("Cancel"), b -> onCancel())
+        cancelBtn = Button.builder(Component.translatable("screen.waypointmod.cancel"), b -> onCancel())
                 .bounds(cx + 5, btnY, btnW, 20)
                 .build();
 
@@ -96,17 +96,17 @@ public class WaypointSettingsScreen extends Screen {
 
     private void buildEntries() {
         // Section: Master
-        entries.add(Entry.header("Master"));
-        entries.add(Entry.toggle("Waypoints", () -> WaypointStorage.isEnabled(), () -> WaypointStorage.toggle()));
-        entries.add(Entry.toggle("HUD Master", () -> WaypointStorage.isHudEnabled(), () -> WaypointStorage.toggleHudEnabled()));
-        entries.add(Entry.toggle("Locator HUD", () -> WaypointStorage.isLocatorHudEnabled(), () -> WaypointStorage.toggleLocatorHudEnabled()));
-        entries.add(Entry.toggle("Waypoint HUD List", () -> WaypointStorage.isWaypointHudEnabled(), () -> WaypointStorage.toggleWaypointHudEnabled()));
-        entries.add(Entry.toggle("Auto Points", () -> WaypointStorage.isAutoPointsEnabled(), () -> WaypointStorage.toggleAutoPoints()));
+        entries.add(Entry.header("screen.waypointmod.settings.master"));
+        entries.add(Entry.toggle("screen.waypointmod.settings.waypoints", () -> WaypointStorage.isEnabled(), () -> WaypointStorage.toggle()));
+        entries.add(Entry.toggle("screen.waypointmod.settings.hud_master", () -> WaypointStorage.isHudEnabled(), () -> WaypointStorage.toggleHudEnabled()));
+        entries.add(Entry.toggle("screen.waypointmod.settings.locator_hud", () -> WaypointStorage.isLocatorHudEnabled(), () -> WaypointStorage.toggleLocatorHudEnabled()));
+        entries.add(Entry.toggle("screen.waypointmod.settings.waypoint_hud_list", () -> WaypointStorage.isWaypointHudEnabled(), () -> WaypointStorage.toggleWaypointHudEnabled()));
+        entries.add(Entry.toggle("screen.waypointmod.settings.auto_points", () -> WaypointStorage.isAutoPointsEnabled(), () -> WaypointStorage.toggleAutoPoints()));
 
         // Section: Locator
-        entries.add(Entry.header("Locator"));
+        entries.add(Entry.header("screen.waypointmod.settings.locator"));
 
-        entries.add(Entry.toggle("Locator ticks",
+        entries.add(Entry.toggle("screen.waypointmod.settings.locator_ticks",
                 () -> WaypointStorage.isLocatorShowTicks(),
                 () -> {
                     WaypointStorage.toggleLocatorShowTicks();
@@ -117,7 +117,7 @@ public class WaypointSettingsScreen extends Screen {
                 }
         ));
 
-        entries.add(Entry.toggle("Flat bar instead of ticks",
+        entries.add(Entry.toggle("screen.waypointmod.settings.flat_bar",
                 () -> WaypointStorage.isLocatorUseFlatBar(),
                 () -> {
                     WaypointStorage.toggleLocatorUseFlatBar();
@@ -128,12 +128,12 @@ public class WaypointSettingsScreen extends Screen {
                 }
         ));
 
-        entries.add(Entry.toggle("Compass labels (N/NE..)",
+        entries.add(Entry.toggle("screen.waypointmod.settings.compass_labels",
                 () -> WaypointStorage.isLocatorShowDirections(),
                 () -> WaypointStorage.toggleLocatorShowDirections()
         ));
 
-        entries.add(Entry.toggle("Waypoint markers",
+        entries.add(Entry.toggle("screen.waypointmod.settings.waypoint_markers",
                 () -> WaypointStorage.isLocatorShowMarkers(),
                 () -> WaypointStorage.toggleLocatorShowMarkers()
         ));
@@ -164,7 +164,7 @@ public class WaypointSettingsScreen extends Screen {
     }
 
     private void updateButtonLabel(Button btn, Entry e) {
-        btn.setMessage(Component.literal(e.getState.getAsBoolean() ? "ON" : "OFF"));
+        btn.setMessage(Component.translatable(e.getState.getAsBoolean() ? "screen.waypointmod.on" : "screen.waypointmod.off"));
     }
 
     private void layoutRowButtons() {
@@ -275,9 +275,9 @@ public class WaypointSettingsScreen extends Screen {
             int textY = rowY + (ROW_H - 8) / 2;
 
             if (e.isHeader) {
-                g.drawCenteredString(this.font, Component.literal(e.label), this.width / 2, rowY + 6, 0xFFFFD34F);
+                g.drawCenteredString(this.font, Component.translatable(e.labelKey), this.width / 2, rowY + 6, 0xFFFFD34F);
             } else {
-                g.drawString(this.font, Component.literal(e.label), textX, textY, 0xFFFFFFFF, false);
+                g.drawString(this.font, Component.translatable(e.labelKey), textX, textY, 0xFFFFFFFF, false);
             }
         }
 
@@ -321,24 +321,24 @@ public class WaypointSettingsScreen extends Screen {
         final boolean isHeader;
         final boolean isToggle;
 
-        final String label;
+        final String labelKey;
         final BoolSupplier getState;
         final Runnable toggle;
 
-        private Entry(boolean isHeader, boolean isToggle, String label, BoolSupplier getState, Runnable toggle) {
+        private Entry(boolean isHeader, boolean isToggle, String labelKey, BoolSupplier getState, Runnable toggle) {
             this.isHeader = isHeader;
             this.isToggle = isToggle;
-            this.label = label;
+            this.labelKey = labelKey;
             this.getState = getState;
             this.toggle = toggle;
         }
 
-        static Entry header(String label) {
-            return new Entry(true, false, label, null, null);
+        static Entry header(String labelKey) {
+            return new Entry(true, false, labelKey, null, null);
         }
 
-        static Entry toggle(String label, BoolSupplier getState, Runnable toggle) {
-            return new Entry(false, true, label, getState, toggle);
+        static Entry toggle(String labelKey, BoolSupplier getState, Runnable toggle) {
+            return new Entry(false, true, labelKey, getState, toggle);
         }
     }
 }
