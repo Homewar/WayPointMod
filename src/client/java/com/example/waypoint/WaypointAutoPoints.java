@@ -7,8 +7,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
-import java.lang.reflect.Method;
 
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Locale;
@@ -57,17 +57,14 @@ public final class WaypointAutoPoints {
         put("end/elytra", "Elytra", 0x55FFDD);
 
         // ====== Trial Chambers (1.21+) ======
-        // Если в твоей версии какой-то id отличается — включи лог и подставь
-        // фактический id.
         put("adventure/minecraft_trials_edition", "TrialChambers", 0x55FFFF);
         put("adventure/under_lock_and_key", "TrialVault", 0x66FFCC);
         put("adventure/revaulting", "OminousVault", 0x66CCFF);
 
-        // ====== Полезные “прокси” (не строго структура, но часто привязано к месту)
-        // ======
-        put("adventure/voluntary_exile", "PillagerCaptain", 0xBBBBBB); // часто возле аванпоста/патруля
-        put("adventure/hero_of_the_village", "RaidWin", 0x55FF55); // деревня
-        put("adventure/totem_of_undying", "Evoker", 0xFFFF55); // рейд/особняк
+        // ====== Полезные “прокси” ======
+        put("adventure/voluntary_exile", "PillagerCaptain", 0xBBBBBB);
+        put("adventure/hero_of_the_village", "RaidWin", 0x55FF55);
+        put("adventure/totem_of_undying", "Evoker", 0xFFFF55);
 
         // Deep Dark “прокси”
         put("adventure/avoid_vibration", "DeepDark", 0x5577FF);
@@ -105,6 +102,9 @@ public final class WaypointAutoPoints {
                 didFirstJoinHere = false;
                 didSpawnPoint = false;
             }
+
+            if (!WaypointStorage.isAutoPointsEnabled())
+                return;
 
             // 1) First join marker (current position)
             if (!didFirstJoinHere) {
@@ -195,6 +195,9 @@ public final class WaypointAutoPoints {
     }
 
     private static void createOnce(Minecraft mc, String name, int color, int x, int y, int z) {
+        if (!WaypointStorage.isAutoPointsEnabled())
+            return;
+
         for (var w : WaypointStorage.listForCurrentAll(mc)) {
             if (w.name != null && w.name.equalsIgnoreCase(name))
                 return;
@@ -238,6 +241,8 @@ public final class WaypointAutoPoints {
 
         if (levelData != null) {
             p = (BlockPos) invokeNoArgs(levelData, BlockPos.class,
+                    "getSharedSpawnPos",
+                    "getSharedSpawnPosition",
                     "getSpawnPos",
                     "getSpawnPosition");
             if (p != null)
