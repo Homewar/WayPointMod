@@ -1,25 +1,20 @@
 package com.example.waypoint;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.Mth;
+import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public final class WaypointHud {
-    private WaypointHud() {
-    }
+    private WaypointHud() {}
 
     private static final int PAGE_SIZE = 5;
     private static int page = 0;
@@ -30,71 +25,60 @@ public final class WaypointHud {
     public static final KeyMapping.Category CATEGORY = KeyMapping.Category
             .register(Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypointmod"));
 
-    public static void register() {
-        nextPage = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+    public static void registerKeyMappings(RegisterKeyMappingsEvent event) {
+        nextPage = new KeyMapping(
                 "key.waypointmod.hud_next",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PAGE_DOWN,
-                CATEGORY));
+                CATEGORY);
 
-        prevPage = KeyBindingHelper.registerKeyBinding(new KeyMapping(
+        prevPage = new KeyMapping(
                 "key.waypointmod.hud_prev",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PAGE_UP,
-                CATEGORY));
+                CATEGORY);
 
-        ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            while (nextPage.consumeClick())
-                page++;
-            while (prevPage.consumeClick())
-                page--;
-        });
-
-        HudElementRegistry.attachElementBefore(
-                VanillaHudElements.CHAT,
-                Identifier.fromNamespaceAndPath(WaypointMod.MOD_ID, "waypoint_hud"),
-                WaypointHud::render);
+        event.register(nextPage);
+        event.register(prevPage);
     }
 
-    private static void render(GuiGraphics g, DeltaTracker tickCounter) {
-        if (!WaypointStorage.isEnabled())
-            return;
-        if (!WaypointStorage.isHudEnabled())
-            return;
-        if (!WaypointStorage.isWaypointHudEnabled())
-            return;
+    public static void onClientTick() {
+        if (nextPage == null || prevPage == null) return;
+        while (nextPage.consumeClick()) page++;
+        while (prevPage.consumeClick()) page--;
+    }
+
+    public static void render(GuiGraphics g) {
+        render(g, 0.0f);
+    }
+
+    public static void render(GuiGraphics g, float partialTick) {
+        if (!WaypointStorage.isEnabled()) return;
+        if (!WaypointStorage.isHudEnabled()) return;
+        if (!WaypointStorage.isWaypointHudEnabled()) return;
 
         Minecraft mc = Minecraft.getInstance();
-        if (mc.player == null || mc.level == null)
-            return;
+        if (mc.player == null || mc.level == null) return;
+        if (mc.options.hideGui) return;
 
-        // ВАЖНО: берём all, чтобы favorites учитывались всегда одинаково.
-        // Hidden отфильтруем тут.
         List<WaypointStorage.Waypoint> src = WaypointStorage.listForCurrentAll(mc);
-        if (src.isEmpty())
-            return;
+        if (src.isEmpty()) return;
 
         ArrayList<WaypointStorage.Waypoint> list = new ArrayList<>(src.size());
         for (var w : src) {
-            if (w == null)
-                continue;
-            if (w.hidden)
-                continue; // hidden скрывает в HUD
+            if (w == null) continue;
+            if (w.hidden) continue;
             list.add(w);
         }
-        if (list.isEmpty())
-            return;
+        if (list.isEmpty()) return;
 
-        // Сортировка: избранные первыми, внутри групп — по дистанции
         list.sort((a, b) -> {
-            if (a.favorite != b.favorite)
-                return a.favorite ? -1 : 1;
+            if (a.favorite != b.favorite) return a.favorite ? -1 : 1;
             return Double.compare(distSq(mc, a), distSq(mc, b));
         });
 
         int total = list.size();
         int pages = Math.max(1, (total + PAGE_SIZE - 1) / PAGE_SIZE);
-
         page = Mth.clamp(page, 0, pages - 1);
 
         int from = page * PAGE_SIZE;
@@ -137,20 +121,13 @@ public final class WaypointHud {
         float playerYaw = mc.player.getYRot();
         float delta = Mth.wrapDegrees(targetYaw - playerYaw);
 
-        if (delta >= -22.5f && delta < 22.5f)
-            return "↑";
-        if (delta >= 22.5f && delta < 67.5f)
-            return "↗";
-        if (delta >= 67.5f && delta < 112.5f)
-            return "→";
-        if (delta >= 112.5f && delta < 157.5f)
-            return "↘";
-        if (delta >= 157.5f || delta < -157.5f)
-            return "↓";
-        if (delta >= -157.5f && delta < -112.5f)
-            return "↙";
-        if (delta >= -112.5f && delta < -67.5f)
-            return "←";
+        if (delta >= -22.5f && delta < 22.5f) return "↑";
+        if (delta >= 22.5f && delta < 67.5f) return "↗";
+        if (delta >= 67.5f && delta < 112.5f) return "→";
+        if (delta >= 112.5f && delta < 157.5f) return "↘";
+        if (delta >= 157.5f || delta < -157.5f) return "↓";
+        if (delta >= -157.5f && delta < -112.5f) return "↙";
+        if (delta >= -112.5f && delta < -67.5f) return "←";
         return "↖";
     }
 }

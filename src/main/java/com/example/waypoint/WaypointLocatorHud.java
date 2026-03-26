@@ -1,8 +1,5 @@
 package com.example.waypoint;
 
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.fabricmc.fabric.api.client.rendering.v1.hud.VanillaHudElements;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.gui.GuiGraphics;
@@ -96,11 +93,11 @@ public final class WaypointLocatorHud {
     private WaypointLocatorHud() {
     }
 
-    public static void init() {
-        HudElementRegistry.attachElementAfter(VanillaHudElements.INFO_BAR, HUD_ID, WaypointLocatorHud::render);
+    public static void render(GuiGraphics g) {
+        render(g, 0.0f);
     }
 
-    private static void render(GuiGraphics g, DeltaTracker delta) {
+    public static void render(GuiGraphics g, float partialTick) {
         if (!WaypointStorage.isHudEnabled())
             return;
         if (!WaypointStorage.isLocatorHudEnabled())
@@ -444,7 +441,7 @@ int hx1 = (c.drawX - halfBase) + HOVER_SHRINK_X;
 
                 var pose = g.pose();
                 pose.pushMatrix();
-                pose.scale(COMPASS_LABEL_SCALE, COMPASS_LABEL_SCALE, pose);
+                pose.scale(COMPASS_LABEL_SCALE, COMPASS_LABEL_SCALE);
 
                 int sx = Math.round(tx / COMPASS_LABEL_SCALE);
                 int sy = Math.round(ty / COMPASS_LABEL_SCALE);
@@ -486,7 +483,7 @@ int hx1 = (c.drawX - halfBase) + HOVER_SHRINK_X;
             var pose = g.pose();
             if (scale != 1.0f) {
                 pose.pushMatrix();
-                pose.scale(scale, scale, pose);
+                pose.scale(scale, scale);
             }
 
             g.drawString(mc.font, s, sx, sy, col, false);
@@ -544,7 +541,7 @@ int hx1 = (c.drawX - halfBase) + HOVER_SHRINK_X;
         var pose = g.pose();
         if (scale != 1.0f) {
             pose.pushMatrix();
-            pose.scale(scale, scale, pose);
+            pose.scale(scale, scale);
         }
 
         int y = sy0;

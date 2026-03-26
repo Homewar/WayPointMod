@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+issueTrackerURL="https://example.invalid/issues"
+
+[[mods]]
+modId="waypointmod"
+version="${file.jarVersion}"
+displayName="Waypoint Mod"
+authors="Me!"
+description='''
+Waypoint client mod ported to NeoForge.
+'''
+logoFile="icon.png"
+
+[[mixins]]
+config="waypointmod.mixins.json"
+
+[[dependencies.waypointmod]]
+modId="neoforge"
+mandatory=true
+versionRange="[21.11,)"
+ordering="NONE"
+side="CLIENT"
+
+[[dependencies.waypointmod]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.21.11,1.22)"
+ordering="NONE"
+side="CLIENT"

@@ -33,8 +33,8 @@ public class WaypointScreen extends Screen {
     private static final int ICON_TEX = 16;
     private static final int ICON_DRAW = 16;
 
-    private static final Identifier ICO_EYE_OPEN = id("waypointmod:textures/gui/icons/eye_closed.png");
-    private static final Identifier ICO_EYE_CLOSED = id("waypointmod:textures/gui/icons/eye_open.png");
+    private static final Identifier ICO_EYE_OPEN = id("waypointmod:textures/gui/icons/eye_open.png");
+    private static final Identifier ICO_EYE_CLOSED = id("waypointmod:textures/gui/icons/eye_closed.png");
     private static final Identifier ICO_CHAT = id("waypointmod:textures/gui/icons/chat.png");
 
     private static Identifier id(String s) {

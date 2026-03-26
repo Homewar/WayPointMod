@@ -487,7 +487,7 @@ public final class WaypointStorage {
 
     private static final class FabricPaths {
         static Path configDir() {
-            return net.fabricmc.loader.api.FabricLoader.getInstance().getConfigDir();
+            return net.neoforged.fml.loading.FMLPaths.CONFIGDIR.get();
         }
     }
 

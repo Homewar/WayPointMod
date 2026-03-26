@@ -13,7 +13,6 @@ public class ClientAdvancementsMixin {
 
     @Inject(method = "update", at = @At("TAIL"))
     private void waypointmod$onUpdateAdvancements(ClientboundUpdateAdvancementsPacket packet, CallbackInfo ci) {
-        // packet.getProgress(): Map<Identifier, AdvancementProgress> в 1.21.11 :contentReference[oaicite:1]{index=1}
         WaypointAutoPoints.onAdvancementProgressUpdate(packet.getProgress());
     }
 }
