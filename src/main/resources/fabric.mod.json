@@ -2,10 +2,10 @@
 	"schemaVersion": 1,
 	"id": "waypointmod",
 	"version": "${version}",
-	"name": "WaypointMod",
-	"description": "Client-side waypoints with commands and simple world markers.",
+	"name": "Waypoint Mod",
+	"description": "This is an example description! Tell everyone what your mod is about!",
 	"authors": [
-		"You"
+		"Me!"
 	],
 	"contact": {
 		"homepage": "https://fabricmc.net/",
@@ -13,7 +13,7 @@
 	},
 	"license": "CC0-1.0",
 	"icon": "assets/waypointmod/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
 		"main": [
 			"com.example.waypoint.WaypointMod"
@@ -23,12 +23,15 @@
 		]
 	},
 	"depends": {
-		"fabricloader": ">=0.18.2",
-		"minecraft": "~1.21.8",
-		"java": ">=21",
+		"fabricloader": ">=0.18.5",
+		"minecraft": "26.1",
+		"java": ">=25",
 		"fabric-api": "*"
 	},
 	"suggests": {
 		"another-mod": "*"
-	}
+	},
+	"mixins": [
+		"waypoint.mixins.json"
+	]
 }

@@ -1,34 +1,26 @@
 package com.example.waypoint;
 
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.network.ServerInfo;
-import net.minecraft.util.WorldSavePath;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.world.level.storage.LevelResource;
 
-import java.net.SocketAddress;
 import java.nio.file.Path;
 import java.util.Locale;
 
 public final class WaypointWorldKey {
     private WaypointWorldKey() {}
 
-    public static String get(MinecraftClient client) {
-        // Singleplayer: уникально по папке сейва
-        var server = client.getServer();
+    public static String get(Minecraft mc) {
+        MinecraftServer server = mc.getSingleplayerServer();
         if (server != null) {
-            Path root = server.getSavePath(WorldSavePath.ROOT);
+            Path root = server.getWorldPath(LevelResource.ROOT);
             return "sp:" + root.toAbsolutePath().normalize();
         }
 
-        // Multiplayer: адрес сервера из списка серверов
-        ServerInfo info = client.getCurrentServerEntry();
-        if (info != null && info.address != null && !info.address.isBlank()) {
-            return "mp:" + info.address.trim().toLowerCase(Locale.ROOT);
-        }
-
-        // Fallback: адрес активного соединения (если ServerInfo == null)
-        if (client.getNetworkHandler() != null && client.getNetworkHandler().getConnection() != null) {
-            SocketAddress addr = client.getNetworkHandler().getConnection().getAddress();
-            if (addr != null) return "mp:" + addr.toString();
+        ServerData data = mc.getCurrentServer();
+        if (data != null && data.ip != null && !data.ip.isBlank()) {
+            return "mp:" + data.ip.trim().toLowerCase(Locale.ROOT);
         }
 
         return "unknown";

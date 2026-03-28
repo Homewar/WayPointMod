@@ -1,7 +1,7 @@
 package com.example.waypoint;
 
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.Minecraft;
 
 public final class WaypointDeathTracker {
     private WaypointDeathTracker() {}
@@ -10,12 +10,13 @@ public final class WaypointDeathTracker {
 
     public static void register() {
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
-            if (client == null || client.player == null || client.world == null) return;
+            Minecraft mc = Minecraft.getInstance();
+            if (mc.player == null || mc.level == null) return;
 
-            boolean alive = client.player.isAlive();
+            boolean alive = mc.player.isAlive();
 
             if (wasAlive && !alive) {
-                WaypointStorage.addDeath(client);
+                WaypointStorage.addDeath(mc);
             }
 
             wasAlive = alive;

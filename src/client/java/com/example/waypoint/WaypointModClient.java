@@ -2,7 +2,6 @@ package com.example.waypoint;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 public class WaypointModClient implements ClientModInitializer {
     @Override
@@ -13,8 +12,13 @@ public class WaypointModClient implements ClientModInitializer {
                 WaypointCommands.register(dispatcher)  
         );
 
-        WorldRenderEvents.AFTER_ENTITIES.register(WaypointRenderer::render);
+        WaypointRenderPipeline.init();
         WaypointDeathTracker.register();
         WaypointHud.register();
+
+        WaypointGui.register();
+        WaypointChatLinks.register();
+        WaypointAutoPoints.init();
+        WaypointLocatorHud.init();
     }
 }
